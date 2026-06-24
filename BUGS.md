@@ -11,13 +11,17 @@ Status key: 🔴 open · 🟡 investigating · 🟢 fix pushed (needs verify) ·
   fire; the sign-in flow is confusing/weird. Needs a full end-to-end click-through.
 - 🟢 **CLI GitHub sign-in opened an unstyled page** — believed fixed; verify on prod
   (open the approve link from a real CLI login and confirm it has styling).
-- 🟡 **CLI claim → not on global leaderboard** *(high priority — core funnel)* — ROOT
+- 🟢 **CLI claim → not on global leaderboard** *(high priority — core funnel)* — ROOT
   CAUSE FOUND. Not a leaderboard bug. `/global` reads a Redis ZSET that only gets a score
-  from a successful `sync`; the write path works (verified: angelafeliciaa is on it). The
-  real issue: `claim` (cli/src/commands/claim.ts:48) ends at "Claimed as @x" and never
-  syncs or nudges — so users stop after claiming. Prod confirms: cherylaurelia claimed
-  (1 device) but 0 usage rows; aliantod 0 devices/0 usage. Fix: auto-sync after a
-  successful claim, then show rank/board link (fall back to a nudge if nothing to upload).
+  from a successful `sync`; the write path works (verified: a known user is on it). The
+  real issue: `claim` ended at "Claimed as @x" and never synced or nudged — so users
+  stopped after claiming. Prod confirmed: a claimed user (1 device) had 0 usage rows.
+  FIXED: `claim` now auto-syncs after a successful claim, then prints the global board +
+  profile links when usage uploaded (or a "use your tools then `tokenboard sync`" nudge
+  when there's nothing to upload yet). A sync failure still doesn't fail the claim (creds
+  are saved). `runSync()` now returns `{ uploaded, accepted }` so claim can branch.
+  Typecheck + CLI tests pass; verify live: claim a fresh machine and confirm the board link
+  appears and the handle shows on `/global`.
 
 ## Navigation
 - 🟢 **Navbar discrepancy: lander vs app** — FIXED (align labels + CTA). Landing nav now uses
