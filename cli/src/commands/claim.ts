@@ -53,16 +53,7 @@ export async function runClaim(): Promise<void> {
       // — so swallow it and nudge the user to retry `tokenboard sync` manually.
       out("");
       try {
-        const sync = await runSync();
-        out("");
-        if (sync.uploaded) {
-          // Synced usage -> the user now ranks on the global board. Point them at it + their profile.
-          out(`  You're on the board: ${base}/global`);
-          out(`  Your profile:       ${base}/user/${result.user.handle}`);
-        } else {
-          // Claimed but no local usage to upload -> no board entry yet; tell them what unlocks it.
-          out("  No local usage found yet — once you use Claude/Codex/Gemini, run `tokenboard sync` to appear on the board.");
-        }
+        await runSync();
       } catch {
         out("  Couldn't sync usage just now — run `tokenboard sync` to appear on the board.");
       }

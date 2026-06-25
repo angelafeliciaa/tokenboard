@@ -33,14 +33,7 @@ async function sendChunk(base: string, token: string, body: SyncRequest): Promis
   }
 }
 
-// `accepted` is the server-confirmed row count; `uploaded` is false when there was no local usage to
-// send (so callers like `claim` can show a "nothing to upload" nudge instead of a board link).
-export interface SyncResult {
-  uploaded: boolean;
-  accepted: number;
-}
-
-export async function runSync(): Promise<SyncResult> {
+export async function runSync(): Promise<void> {
   const auth = await readAuthFile();
   if (!auth) throw new Error("not signed in — run `tokenboard claim` first."); // fail loud -> non-zero exit
 
@@ -48,7 +41,7 @@ export async function runSync(): Promise<SyncResult> {
   const { records } = await collectLocalRecords();
   if (records.length === 0) {
     process.stdout.write("  tokenboard sync — nothing to upload (no local usage found).\n");
-    return { uploaded: false, accepted: 0 };
+    return;
   }
 
   const tz = tzOffsetMinutes();
@@ -81,6 +74,4 @@ export async function runSync(): Promise<SyncResult> {
     process.stderr.write(`  rejected: ${breakdown}\n`);
   }
   for (const [code, n] of flagCounts) process.stderr.write(`  flag: ${code} x${n}\n`);
-
-  return { uploaded: true, accepted };
 }
