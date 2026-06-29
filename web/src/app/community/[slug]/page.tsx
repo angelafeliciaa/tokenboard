@@ -3,7 +3,7 @@
 // fetch-to-self: no self-HTTP hop, no second cookie round-trip, full BoardResponse types. The window
 // tabs + metric toggle are client leaves that drive ?window=/?metric=, so this re-renders server-side.
 import { cache } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { boardQuerySchema } from "@tokenboard/contracts";
 import { getViewer } from "@/lib/auth/get-viewer";
 import { resolveBoardScope } from "@/lib/leaderboard/resolve-scope";
@@ -96,14 +96,27 @@ export default async function BoardPage({
   searchParams: Promise<Search>;
 }) {
   const { slug } = await params;
-  const res = await loadBoardFromSearch(slug, await searchParams);
+  const sp = await searchParams;
+  const res = await loadBoardFromSearch(slug, sp);
   if (res.kind === "outage") throw new Error("auth_unavailable");
   if (res.kind !== "ok") notFound();
 
   const { board, viewer } = res;
-  const page = parsePage(await searchParams);
+  const page = parsePage(sp);
   const isGlobal = slug.toLowerCase() === "global" || slug === "";
   const currentPath = isGlobal ? "/global" : `/community/${slug}`;
+
+  // Out-of-range page (e.g. ?page=99 on a 2-page board): the offset read is empty, which would
+  // otherwise render "No synced usage" with no pager to recover. totalEntries is ZCARD (independent of
+  // the page), so redirect an over-shoot to the real last page instead of showing a dead end.
+  if (board.entries.length === 0 && board.totalEntries > 0) {
+    const lastPage = Math.max(1, Math.ceil(board.totalEntries / WEB_PAGE_SIZE));
+    if (page > lastPage) {
+      const params = new URLSearchParams({ window: board.window, metric: board.metric });
+      if (lastPage > 1) params.set("page", String(lastPage));
+      redirect(`${currentPath}?${params.toString()}`);
+    }
+  }
 
   // COMPANY-board privacy gate (DESIGN §7.2): there's no opt-in/alias column yet, so until Phase 8
   // lands it, company boards alias every row by rank rather than leak real handles.
