@@ -25,6 +25,9 @@ export const boardQuerySchema = z.object({
   // coerce: HTTP query params arrive as strings (?limit=50), so parse "50" -> 50.
   // The .max(200)/.positive() guards still reject "999"/"abc"/"-5" after coercion.
   limit: z.coerce.number().int().positive().max(200).default(50),
+  // Page offset (0-based, rows to skip). Enables paging: page N => offset (N-1)*limit. Coerced +
+  // clamped like limit; a bad/negative value floors to 0.
+  offset: z.coerce.number().int().nonnegative().max(100_000).default(0),
   format: boardFormatSchema.default("json"),
 });
 

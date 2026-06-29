@@ -8,7 +8,7 @@ import { boardQuerySchema } from "@tokenboard/contracts";
 import { getViewer } from "@/lib/auth/get-viewer";
 import { resolveBoardScope } from "@/lib/leaderboard/resolve-scope";
 import { assembleBoard } from "@/lib/leaderboard/assemble-board";
-import { WEB_DEFAULT_METRIC, WEB_DEFAULT_WINDOW } from "@/lib/board/web-defaults";
+import { WEB_DEFAULT_METRIC, WEB_DEFAULT_WINDOW, WEB_PAGE_SIZE } from "@/lib/board/web-defaults";
 import { ogImageUrl } from "@/lib/og/og-hash";
 import { SiteNav } from "@/components/site-nav";
 import { SiteFooter } from "@/components/site-footer";
@@ -30,11 +30,18 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 // Keyed on primitives (not the searchParams object) so generateMetadata and the page component share
 // one result via React cache() per request — otherwise the getViewer + scope + assembleBoard chain
 // runs twice per navigation.
-const loadBoard = cache(async function loadBoard(slug: string, windowParam: string, metricParam: string) {
+const loadBoard = cache(async function loadBoard(
+  slug: string,
+  windowParam: string,
+  metricParam: string,
+  page: number,
+) {
   const parsed = boardQuerySchema.safeParse({
     community: slug,
     window: windowParam,
     metric: metricParam,
+    limit: WEB_PAGE_SIZE,
+    offset: (page - 1) * WEB_PAGE_SIZE,
   });
   if (!parsed.success) return { kind: "notfound" as const };
 
@@ -55,8 +62,14 @@ const loadBoard = cache(async function loadBoard(slug: string, windowParam: stri
   return { kind: "ok" as const, board, viewer };
 });
 
+// ?page= is 1-based; a missing/invalid/<1 value floors to page 1.
+function parsePage(sp: Search): number {
+  const n = Number.parseInt(one(sp.page) ?? "", 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
 const loadBoardFromSearch = (slug: string, sp: Search) =>
-  loadBoard(slug, one(sp.window) ?? WEB_DEFAULT_WINDOW, one(sp.metric) ?? WEB_DEFAULT_METRIC);
+  loadBoard(slug, one(sp.window) ?? WEB_DEFAULT_WINDOW, one(sp.metric) ?? WEB_DEFAULT_METRIC, parsePage(sp));
 
 export async function generateMetadata({
   params,
@@ -88,13 +101,16 @@ export default async function BoardPage({
   if (res.kind !== "ok") notFound();
 
   const { board, viewer } = res;
+  const page = parsePage(await searchParams);
   const isGlobal = slug.toLowerCase() === "global" || slug === "";
   const currentPath = isGlobal ? "/global" : `/community/${slug}`;
 
   // COMPANY-board privacy gate (DESIGN §7.2): there's no opt-in/alias column yet, so until Phase 8
   // lands it, company boards alias every row by rank rather than leak real handles.
   const aliasCompany = board.community?.type === "company";
-  const pinnedMe = board.me && board.me.inTopN === false ? board.me.entry : null;
+  // Pin "you" below the page only when you're off it AND we're on page 1 (the pin is a once-only
+  // "here's where you stand" cue; repeating it on every page would be noise).
+  const pinnedMe = page === 1 && board.me && board.me.inTopN === false ? board.me.entry : null;
 
   return (
     <div className={`${styles.surfaceBoardBase} ${styles.surfaceBoardArcade}`}>
@@ -141,7 +157,15 @@ export default async function BoardPage({
               </ul>
             )}
 
-            <Pager totalEntries={board.totalEntries} shown={board.entries.length} />
+            <Pager
+              totalEntries={board.totalEntries}
+              shown={board.entries.length}
+              page={page}
+              pageSize={WEB_PAGE_SIZE}
+              basePath={currentPath}
+              window={board.window}
+              metric={board.metric}
+            />
           </div>
 
           <aside className={styles.rail}>

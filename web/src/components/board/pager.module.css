@@ -1,5 +1,5 @@
-/* Pager row, lifted from dashboard-pixel .pager-row / .pager. The nav arrows are disabled (no cursor
-   in the contract yet); kept for visual parity. */
+/* Pager row, lifted from dashboard-pixel .pager-row / .pager. Page cells are <a> links (real paging
+   via ?page=); the current page + the disabled end arrows are <span>s. */
 .pagerRow {
   display: flex;
   align-items: center;
@@ -34,6 +34,19 @@
   display: grid;
   place-items: center;
   user-select: none;
+  text-decoration: none;
+  transition:
+    color 0.12s,
+    border-color 0.12s;
+}
+/* hover only the interactive (link) cells — the active page + disabled ends are spans. */
+a.pg:hover {
+  color: var(--ink);
+  border-color: var(--frame-hi);
+}
+.pg:focus-visible {
+  outline: 2px solid var(--coral-hi);
+  outline-offset: 2px;
 }
 .active {
   color: var(--on-coral);
@@ -42,9 +55,8 @@
 }
 .nav {
   font-size: var(--fs-12);
-  cursor: pointer;
 }
-.nav:disabled {
+/* disabled end arrows are aria-disabled spans (no href) — visually muted, not interactive. */
+.nav[aria-disabled="true"] {
   opacity: 0.35;
-  cursor: default;
 }

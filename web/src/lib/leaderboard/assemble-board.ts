@@ -48,8 +48,11 @@ export async function assembleBoard(params: {
   const now = new Date();
   const { windowStart, windowEnd } = windowBounds(query.window, now);
 
-  // (2) top-N from Redis (over-fetch for banned filtering). Flat [member, score, ...].
-  const flat = (await redis.zrange(key, 0, query.limit - 1 + OVERFETCH, {
+  // (2) one page from Redis starting at `offset` (over-fetch for banned filtering). The over-fetch
+  // only pads the tail; banned rows ABOVE this page already shifted real ranks, but the write-path +
+  // nightly rebuild keep the ZSET banned-free, so offset-based ranks are correct in practice (the
+  // same straggler caveat as me.rank below). Flat [member, score, ...].
+  const flat = (await redis.zrange(key, query.offset, query.offset + query.limit - 1 + OVERFETCH, {
     rev: true,
     withScores: true,
   })) as Array<string | number>;
@@ -69,6 +72,7 @@ export async function assembleBoard(params: {
       windowStart,
       windowEnd,
       limit: query.limit,
+      offset: query.offset,
     });
   } else {
     // banned exclusion (Redis path): ONE query.
@@ -168,7 +172,9 @@ export async function assembleBoard(params: {
     };
   };
 
-  const entries: BoardEntry[] = ranked.map((r, i) => toEntry(r.userId, r.score, i + 1));
+  // Ranks are absolute (1-based across the whole board), so the page starting at `offset` begins at
+  // rank offset+1.
+  const entries: BoardEntry[] = ranked.map((r, i) => toEntry(r.userId, r.score, query.offset + i + 1));
 
   // (7) me union
   let me: BoardMe = null;
