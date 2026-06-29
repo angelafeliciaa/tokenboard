@@ -106,16 +106,15 @@ export default async function BoardPage({
   const isGlobal = slug.toLowerCase() === "global" || slug === "";
   const currentPath = isGlobal ? "/global" : `/community/${slug}`;
 
-  // Out-of-range page (e.g. ?page=99 on a 2-page board): the offset read is empty, which would
-  // otherwise render "No synced usage" with no pager to recover. totalEntries is ZCARD (independent of
-  // the page), so redirect an over-shoot to the real last page instead of showing a dead end.
-  if (board.entries.length === 0 && board.totalEntries > 0) {
-    const lastPage = Math.max(1, Math.ceil(board.totalEntries / WEB_PAGE_SIZE));
-    if (page > lastPage) {
-      const params = new URLSearchParams({ window: board.window, metric: board.metric });
-      if (lastPage > 1) params.set("page", String(lastPage));
-      redirect(`${currentPath}?${params.toString()}`);
-    }
+  // Any empty page beyond page 1 is a dead end ("No synced usage", no pager to recover) — whether an
+  // over-shoot (?page=99) OR a tail page whose rows all got banned-filtered (banned stragglers inflate
+  // totalEntries/ZCARD, so a totalEntries-derived "last page" can itself be empty). Redirect to page 1:
+  // the canonical top, which holds the real entries, and which never redirects (page > 1 guard) — so
+  // no loop. If page 1 is itself empty, the board genuinely has nothing to show and renders the empty
+  // state correctly.
+  if (board.entries.length === 0 && page > 1) {
+    const params = new URLSearchParams({ window: board.window, metric: board.metric });
+    redirect(`${currentPath}?${params.toString()}`);
   }
 
   // COMPANY-board privacy gate (DESIGN §7.2): there's no opt-in/alias column yet, so until Phase 8
