@@ -16,8 +16,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  // CSRF: session-cookie-authed write -> require application/json (a cross-site form can't send it).
-  const badContentType = requireJsonContentType(request);
+  const badContentType = requireJsonContentType(request); // CSRF guard
   if (badContentType) return badContentType;
 
   let body: unknown;

@@ -18,9 +18,7 @@ export const dynamic = "force-dynamic";
 const INGEST_TTL_DAYS = 90; // initial sliding window; sync bumps it (Phase 5)
 
 export async function POST(request: NextRequest) {
-  // CSRF: this binds a device to the session user, so reject non-JSON (a cross-site form can't send
-  // application/json) before touching the body. See lib/http/require-json.ts.
-  const badContentType = requireJsonContentType(request);
+  const badContentType = requireJsonContentType(request); // CSRF guard
   if (badContentType) return badContentType;
 
   let body: unknown;

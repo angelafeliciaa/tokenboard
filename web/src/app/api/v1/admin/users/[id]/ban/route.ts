@@ -23,8 +23,7 @@ const BAN_DURATION = "876000h"; // ~100yr permanent ban; "none" lifts it.
 const notFound = () => NextResponse.json({ error: "not_found" }, { status: 404 });
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  // CSRF: admin (session-cookie) write -> require application/json (a cross-site form can't send it).
-  const badContentType = requireJsonContentType(request);
+  const badContentType = requireJsonContentType(request); // CSRF guard
   if (badContentType) return badContentType;
 
   const { id } = await ctx.params;

@@ -18,8 +18,7 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  // CSRF: session-cookie-authed write -> require application/json (a cross-site form can't send it).
-  const badContentType = requireJsonContentType(request);
+  const badContentType = requireJsonContentType(request); // CSRF guard
   if (badContentType) return badContentType;
 
   const { id } = await ctx.params; // Next 16 async params

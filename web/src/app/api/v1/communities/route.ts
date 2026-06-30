@@ -22,8 +22,7 @@ const SLUG_RETRIES = 6;
 const UNIQUE_VIOLATION = "23505";
 
 export async function POST(request: NextRequest) {
-  // CSRF: session-cookie-authed write -> require application/json (a cross-site form can't send it).
-  const badContentType = requireJsonContentType(request);
+  const badContentType = requireJsonContentType(request); // CSRF guard
   if (badContentType) return badContentType;
 
   let body: unknown;
