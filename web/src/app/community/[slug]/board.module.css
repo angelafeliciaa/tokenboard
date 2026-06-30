@@ -14,7 +14,13 @@
   max-width: var(--maxw-board);
   margin: 0 auto;
   flex: 1 1 auto;
-  padding: 26px 28px 8px;
+  padding: 18px 28px 8px;
+  /* Center the board in the available height so a short page (page 2, a small board) doesn't leave a
+     big empty band above the footer. When content is taller than the space it overflows top-aligned
+     (safe-centering), so nothing is clipped on small screens. */
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
 }
 .layout {
   display: grid;
@@ -30,13 +36,13 @@
   background: var(--bg-2);
   border: 1px solid var(--frame);
   border-radius: 14px;
-  padding: 24px 30px 20px;
+  padding: 18px 30px 16px;
   position: relative;
 }
 
 .head {
   text-align: left;
-  padding: 0 0 12px;
+  padding: 0 0 8px;
 }
 .title {
   font-family: var(--money);
@@ -55,7 +61,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 2px 0 14px;
+  margin: 2px 0 10px;
   flex-wrap: wrap;
 }
 
@@ -68,7 +74,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .rule {
   flex: 1;

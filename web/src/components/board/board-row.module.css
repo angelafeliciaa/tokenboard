@@ -2,10 +2,10 @@
    Medals for the top 3; the caller's row gets a coral tint + an inset left marker. */
 .pl {
   display: grid;
-  grid-template-columns: 26px 36px 1fr;
+  grid-template-columns: 26px 32px 1fr;
   column-gap: 14px;
   align-items: center;
-  padding: 10px 8px;
+  padding: 6px 8px;
   position: relative;
   border-bottom: 1px solid var(--frame);
   transition: background 0.12s;
@@ -19,8 +19,8 @@
 
 /* avatar */
 .pfp {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 7px;
   border: 1px solid var(--frame);
   background: var(--panel-2);
