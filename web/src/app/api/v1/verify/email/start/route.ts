@@ -15,12 +15,17 @@ import { checkDomainMx } from "@/lib/verify/mx";
 import { mintOtpCode, hashOtp } from "@/lib/verify/code";
 import { sendVerificationEmail } from "@/lib/verify/send-code-email";
 import { enforce } from "@/lib/ratelimit/enforce";
+import { requireJsonContentType } from "@/lib/http/require-json";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const TTL_SEC = 900; // 15m
 
 export async function POST(request: NextRequest) {
+  // CSRF: session-cookie-authed write -> require application/json (a cross-site form can't send it).
+  const badContentType = requireJsonContentType(request);
+  if (badContentType) return badContentType;
+
   let body: unknown;
   try {
     body = await request.json();

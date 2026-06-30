@@ -10,11 +10,16 @@ import { checkJoinLockout, recordJoinFailure } from "@/lib/communities/join-lock
 import { profKey } from "@/lib/leaderboard/keys";
 import { redis } from "@/lib/redis/client";
 import { enforce } from "@/lib/ratelimit/enforce";
+import { requireJsonContentType } from "@/lib/http/require-json";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  // CSRF: session-cookie-authed write -> require application/json (a cross-site form can't send it).
+  const badContentType = requireJsonContentType(request);
+  if (badContentType) return badContentType;
+
   let body: unknown;
   try {
     body = await request.json();
