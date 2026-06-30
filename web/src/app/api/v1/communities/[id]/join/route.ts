@@ -10,6 +10,7 @@ import { checkJoinLockout, recordJoinFailure } from "@/lib/communities/join-lock
 import { profKey } from "@/lib/leaderboard/keys";
 import { redis } from "@/lib/redis/client";
 import { enforce } from "@/lib/ratelimit/enforce";
+import { requireJsonContentType } from "@/lib/http/require-json";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,9 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const badContentType = requireJsonContentType(request); // CSRF guard
+  if (badContentType) return badContentType;
+
   const { id } = await ctx.params; // Next 16 async params
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
 

@@ -11,12 +11,16 @@ import { deviceGrants, ingestDevices } from "@/db/schema";
 import { cliLoginApproveRequestSchema } from "@tokenboard/contracts";
 import { mintIngestToken, sha256Bytes } from "@/lib/cli-login/token";
 import { seedZeroScoresForUser } from "@/lib/leaderboard/seed-zero-scores";
+import { requireJsonContentType } from "@/lib/http/require-json";
 
 export const dynamic = "force-dynamic";
 
 const INGEST_TTL_DAYS = 90; // initial sliding window; sync bumps it (Phase 5)
 
 export async function POST(request: NextRequest) {
+  const badContentType = requireJsonContentType(request); // CSRF guard
+  if (badContentType) return badContentType;
+
   let body: unknown;
   try {
     body = await request.json();

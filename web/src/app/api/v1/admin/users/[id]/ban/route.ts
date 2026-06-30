@@ -13,6 +13,7 @@ import { redis } from "@/lib/redis/client";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { enforce } from "@/lib/ratelimit/enforce";
+import { requireJsonContentType } from "@/lib/http/require-json";
 import { boardTag, profKey, scopeForCommunity, METRIC_TOKENS, ALL_WINDOWS } from "@/lib/leaderboard/keys";
 
 export const runtime = "nodejs";
@@ -22,6 +23,9 @@ const BAN_DURATION = "876000h"; // ~100yr permanent ban; "none" lifts it.
 const notFound = () => NextResponse.json({ error: "not_found" }, { status: 404 });
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const badContentType = requireJsonContentType(request); // CSRF guard
+  if (badContentType) return badContentType;
+
   const { id } = await ctx.params;
   if (!UUID_RE.test(id)) return notFound();
   const admin = await requireAdmin();
