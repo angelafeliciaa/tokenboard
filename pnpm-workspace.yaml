@@ -6,3 +6,6 @@ packages:
 allowBuilds:
   esbuild: true
   sharp: true
+# Force the transitive postcss (pulled by next/tsup) past the </style> XSS advisory (GHSA, <8.5.10).
+overrides:
+  postcss@<8.5.10: "8.5.16"
