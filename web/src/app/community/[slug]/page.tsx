@@ -166,6 +166,13 @@ export default async function BoardPage({
                     pinned
                   />
                 )}
+                {/* Pad short pages with empty rows so the card keeps a constant height + position —
+                    the board doesn't jump/resize when a page has fewer than WEB_PAGE_SIZE entries. */}
+                {Array.from({
+                  length: Math.max(0, WEB_PAGE_SIZE - board.entries.length - (pinnedMe ? 1 : 0)),
+                }).map((_, i) => (
+                  <li key={`filler-${i}`} className={styles.fillerRow} aria-hidden="true" />
+                ))}
               </ul>
             )}
 

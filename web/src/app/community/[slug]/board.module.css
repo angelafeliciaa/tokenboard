@@ -15,12 +15,6 @@
   margin: 0 auto;
   flex: 1 1 auto;
   padding: 18px 28px 8px;
-  /* Center the board in the available height so a short page (page 2, a small board) doesn't leave a
-     big empty band above the footer. When content is taller than the space it overflows top-aligned
-     (safe-centering), so nothing is clipped on small screens. */
-  display: flex;
-  flex-direction: column;
-  justify-content: safe center;
 }
 .layout {
   display: grid;
@@ -95,6 +89,16 @@
   list-style: none;
   display: flex;
   flex-direction: column;
+}
+
+/* Empty placeholder row: keeps the card a constant height when a page has <10 entries, so the board
+   never jumps position or resizes. Matches a real row's height (avatar 32 + padding 6*2 + 1px border). */
+.fillerRow {
+  height: 45px;
+  border-bottom: 1px solid var(--frame);
+}
+.fillerRow:last-child {
+  border-bottom: none;
 }
 
 .empty {
