@@ -124,11 +124,17 @@ export default async function BoardPage({
   // "here's where you stand" cue; repeating it on every page would be noise).
   const pinnedMe = page === 1 && board.me && board.me.inTopN === false ? board.me.entry : null;
 
+  // The right rail only has content when the viewer has a ranked standing OR the board is a community
+  // (which shows the CommunityPanel). On the signed-out global board it's empty — so drop the rail and
+  // let the board use the full width instead of leaving a dead 360px column.
+  const hasStanding = viewer != null && board.me != null;
+  const showRail = hasStanding || board.community != null;
+
   return (
     <div className={`${styles.surfaceBoardBase} ${styles.surfaceBoardArcade}`}>
       <SiteNav active={isGlobal ? "global" : "communities"} viewer={viewer} currentPath={currentPath} />
       <main className={styles.shell}>
-        <div className={styles.layout}>
+        <div className={`${styles.layout} ${showRail ? "" : styles.layoutSolo}`}>
           <div className={styles.card}>
             <div className={styles.head}>
               <BoardTitle name={board.community?.name ?? "Global"} />
@@ -187,16 +193,18 @@ export default async function BoardPage({
             />
           </div>
 
-          <aside className={styles.rail}>
-            <YourStanding
-              me={board.me}
-              entries={board.entries}
-              metric={board.metric}
-              viewer={viewer}
-              aliasCompany={aliasCompany}
-            />
-            {board.community && <CommunityPanel community={board.community} />}
-          </aside>
+          {showRail && (
+            <aside className={styles.rail}>
+              <YourStanding
+                me={board.me}
+                entries={board.entries}
+                metric={board.metric}
+                viewer={viewer}
+                aliasCompany={aliasCompany}
+              />
+              {board.community && <CommunityPanel community={board.community} />}
+            </aside>
+          )}
         </div>
       </main>
       <SiteFooter variant="board" />

@@ -22,6 +22,12 @@
   gap: 22px;
   align-items: start;
 }
+/* No right rail (e.g. the signed-out global board) — one centered column instead of a dead 360px
+   gap. Capped width so the board doesn't stretch uncomfortably wide on a big screen. */
+.layoutSolo {
+  grid-template-columns: minmax(0, 720px);
+  justify-content: center;
+}
 
 .card {
   width: 100%;
