@@ -14,7 +14,7 @@
   max-width: var(--maxw-board);
   margin: 0 auto;
   flex: 1 1 auto;
-  padding: 18px 28px 8px;
+  padding: 12px 28px 4px;
 }
 .layout {
   display: grid;
@@ -36,7 +36,7 @@
 
 .head {
   text-align: left;
-  padding: 0 0 8px;
+  padding: 0 0 4px;
 }
 .title {
   font-family: var(--money);
@@ -55,7 +55,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 2px 0 10px;
+  margin: 0 0 8px;
   flex-wrap: wrap;
 }
 
@@ -92,13 +92,9 @@
 }
 
 /* Empty placeholder row: keeps the card a constant height when a page has <10 entries, so the board
-   never jumps position or resizes. Matches a real row's height (avatar 32 + padding 6*2 + 1px border). */
+   never jumps position or resizes. Blank (no divider) — matches a real row's height. */
 .fillerRow {
   height: 45px;
-  border-bottom: 1px solid var(--frame);
-}
-.fillerRow:last-child {
-  border-bottom: none;
 }
 
 .empty {
