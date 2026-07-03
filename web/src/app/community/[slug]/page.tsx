@@ -130,6 +130,13 @@ export default async function BoardPage({
   const hasStanding = viewer != null && board.me != null;
   const showRail = hasStanding || board.community != null;
 
+  // Filler rows keep the card height CONSISTENT ACROSS PAGES, but never taller than the board's real
+  // size: pad each page up to min(pageSize, totalEntries) rows. A full 10-per-page board pads to 10;
+  // a 3-entry board pads to 3; a 1-member board shows 1 row (no empty box).
+  const rowsThisPage = board.entries.length + (pinnedMe ? 1 : 0);
+  const targetRows = Math.min(WEB_PAGE_SIZE, board.totalEntries);
+  const fillerCount = Math.max(0, targetRows - rowsThisPage);
+
   return (
     <div className={`${styles.surfaceBoardBase} ${styles.surfaceBoardArcade}`}>
       <SiteNav active={isGlobal ? "global" : "communities"} viewer={viewer} currentPath={currentPath} />
@@ -172,11 +179,10 @@ export default async function BoardPage({
                     pinned
                   />
                 )}
-                {/* Pad short pages with empty rows so the card keeps a constant height + position —
-                    the board doesn't jump/resize when a page has fewer than WEB_PAGE_SIZE entries. */}
-                {Array.from({
-                  length: Math.max(0, WEB_PAGE_SIZE - board.entries.length - (pinnedMe ? 1 : 0)),
-                }).map((_, i) => (
+                {/* Pad only so the card height is CONSISTENT ACROSS PAGES of the same board — never
+                    beyond how many rows the board actually has. A full board's pages pad to
+                    WEB_PAGE_SIZE; a tiny board (e.g. 1 member) shows 1 row, not 9 empty ones. */}
+                {Array.from({ length: fillerCount }).map((_, i) => (
                   <li key={`filler-${i}`} className={styles.fillerRow} aria-hidden="true" />
                 ))}
               </ul>
