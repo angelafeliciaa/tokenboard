@@ -117,6 +117,11 @@ a {
   text-decoration: none;
 }
 
+/* Dark bg on html (not just body) so the theme fills the WHOLE viewport — any area below short
+   content, plus rubber-band overscroll, stays dark instead of flashing the browser's white default. */
+html {
+  background: var(--bg);
+}
 body {
   background: var(--bg);
   color: var(--ink);
