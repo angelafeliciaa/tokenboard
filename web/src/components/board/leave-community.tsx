@@ -18,17 +18,21 @@ export function LeaveCommunity({
   async function leave() {
     setBusy(true);
     setError(null);
-    const res = await fetch(`/api/v1/communities/${communityId}/leave`, { method: "POST" });
-    if (res.ok) {
-      router.push("/communities");
-      return;
+    try {
+      const res = await fetch(`/api/v1/communities/${communityId}/leave`, { method: "POST" });
+      if (res.ok) {
+        router.push("/communities");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      setError(
+        data.error === "last_owner"
+          ? "You're the only owner — transfer ownership before leaving."
+          : "Couldn't leave. Try again.",
+      );
+    } catch {
+      setError("Couldn't leave. Try again.");
     }
-    const data = await res.json().catch(() => ({}));
-    setError(
-      data.error === "last_owner"
-        ? "You're the only owner — transfer ownership before leaving."
-        : "Couldn't leave. Try again.",
-    );
     setBusy(false);
     setConfirming(false);
   }

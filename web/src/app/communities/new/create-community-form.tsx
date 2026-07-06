@@ -48,11 +48,13 @@ export function CreateCommunityForm() {
   if (created) {
     const path = new URL(created.join_url).pathname;
     const link = created.join_code ? inviteLink(window.location.origin, created.join_code) : null;
-    const copy = (which: "code" | "link", text: string) =>
-      navigator.clipboard
-        ?.writeText(text)
+    const copy = (which: "code" | "link", text: string) => {
+      const clipboard = navigator.clipboard;
+      if (!clipboard) return;
+      Promise.resolve(clipboard.writeText(text))
         .then(() => setCopied(which))
         .catch(() => {});
+    };
     return (
       <section className={styles.card} role="status">
         <p className={styles.success}>Created. Share the invite link (or code) so people can join:</p>

@@ -39,3 +39,15 @@ test("parseInviteCode rejects junk and ambiguous-alphabet chars", () => {
   assert.equal(parseInviteCode("https://tokenboard.app/communities"), null);
   assert.equal(parseInviteCode("https://tokenboard.app/communities?code=NOPE!!"), null);
 });
+
+test("parseInviteCode does not match code= embedded in another word", () => {
+  // `passcode=ABCD23` must not be read as an invite code via the non-URL fallback.
+  assert.equal(parseInviteCode("passcode=ABCD23"), null);
+  assert.equal(parseInviteCode("xcode=ABCD23"), null);
+});
+
+test("parseInviteCode returns null on malformed percent-encoding instead of throwing", () => {
+  // Non-URL fallback path with an invalid escape must not throw a URIError.
+  assert.equal(parseInviteCode("code=%E0%A4%A"), null);
+  assert.equal(parseInviteCode("code=%"), null);
+});

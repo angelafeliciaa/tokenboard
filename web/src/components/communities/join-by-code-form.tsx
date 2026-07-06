@@ -11,7 +11,7 @@ export function JoinByCodeForm({ autoCode }: { autoCode?: string }) {
   const [value, setValue] = useState(autoCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const autoSubmitted = useRef(false);
+  const autoSubmittedCode = useRef<string | null>(null);
 
   async function join(rawInput: string) {
     const code = parseInviteCode(rawInput);
@@ -45,8 +45,9 @@ export function JoinByCodeForm({ autoCode }: { autoCode?: string }) {
   }
 
   useEffect(() => {
-    if (autoCode && !autoSubmitted.current) {
-      autoSubmitted.current = true;
+    if (autoCode && autoSubmittedCode.current !== autoCode) {
+      autoSubmittedCode.current = autoCode;
+      setValue(autoCode);
       void join(autoCode);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -25,7 +25,12 @@ function readCodeParam(raw: string): string | null {
     const v = url.searchParams.get("code");
     return v ? v.toUpperCase() : null;
   } catch {
-    const m = raw.match(/[?&]?code=([^&\s]+)/i);
-    return m?.[1] ? decodeURIComponent(m[1]).toUpperCase() : null;
+    const m = raw.match(/(?:^|[?&])code=([^&\s]+)/i);
+    if (!m?.[1]) return null;
+    try {
+      return decodeURIComponent(m[1]).toUpperCase();
+    } catch {
+      return null;
+    }
   }
 }
