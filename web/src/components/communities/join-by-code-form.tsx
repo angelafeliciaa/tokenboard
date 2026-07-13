@@ -11,6 +11,10 @@ export function JoinByCodeForm({ autoCode }: { autoCode?: string }) {
   const [value, setValue] = useState(autoCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When the code is valid but the viewer is signed out, we don't just say "sign in" — we send them
+  // through OAuth and back to /communities?code=<code> so the auto-join fires post-login. The nav's
+  // generic Sign-in button drops the code (next=/me), which is the whole point of an invite link.
+  const [signInCode, setSignInCode] = useState<string | null>(null);
   const autoSubmittedCode = useRef<string | null>(null);
 
   async function join(rawInput: string) {
@@ -21,6 +25,7 @@ export function JoinByCodeForm({ autoCode }: { autoCode?: string }) {
     }
     setBusy(true);
     setError(null);
+    setSignInCode(null);
     try {
       const res = await fetch("/api/v1/communities/join", {
         method: "POST",
@@ -29,7 +34,7 @@ export function JoinByCodeForm({ autoCode }: { autoCode?: string }) {
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        if (res.status === 401) setError("Sign in to join a board.");
+        if (res.status === 401) setSignInCode(code);
         else if (data.error === "banned") setError("Your account can't join boards.");
         else if (res.status === 403) setError("That code didn't match any board. Check it and try again.");
         else setError("Something went wrong. Try again.");
@@ -80,10 +85,18 @@ export function JoinByCodeForm({ autoCode }: { autoCode?: string }) {
           {busy ? "Joining…" : "Join"}
         </button>
       </div>
-      {error && (
+      {signInCode ? (
         <p className={styles.errorNote} role="alert">
-          {error}
+          <a href={`/api/auth/login?next=${encodeURIComponent(`/communities?code=${signInCode}`)}`}>
+            Sign in to join this board.
+          </a>
         </p>
+      ) : (
+        error && (
+          <p className={styles.errorNote} role="alert">
+            {error}
+          </p>
+        )
       )}
     </form>
   );
