@@ -84,6 +84,14 @@ test("sanitizeTerminalText removes control chars and newlines", () => {
   assert.equal(sanitizeTerminalText("plain-handle"), "plain-handle");
 });
 
+test("sanitizeTerminalText removes unicode bidi and zero-width controls, keeps normal text", () => {
+  const rlo = String.fromCharCode(0x202e);
+  const zwsp = String.fromCharCode(0x200b);
+  const bom = String.fromCharCode(0xfeff);
+  assert.equal(sanitizeTerminalText(`ev${rlo}il${zwsp}x${bom}`), "evilx");
+  assert.equal(sanitizeTerminalText("café-münchen"), "café-münchen");
+});
+
 test("board table neutralizes escape/newline injection from remote handles", () => {
   const evil = board({
     entries: [entry({ rank: 1, handle: `${ESC}[2Jevil${NEWLINE}injected`, isMe: false })],

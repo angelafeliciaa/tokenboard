@@ -18,9 +18,12 @@ export async function readLastRun(logPath: string): Promise<{ at: Date; line: st
     const start = Math.max(0, info.size - LOG_TAIL_BYTES);
     const length = info.size - start;
     const buffer = Buffer.alloc(length);
-    if (length > 0) await handle.read(buffer, 0, length, start);
-    const lastLine = buffer.toString("utf8").split("\n").map((l) => l.trim()).filter(Boolean).at(-1);
-    return { at: info.mtime, line: lastLine ?? "(no output yet)" };
+    const bytesRead = length > 0 ? (await handle.read(buffer, 0, length, start)).bytesRead : 0;
+    const text = buffer.subarray(0, bytesRead).toString("utf8");
+    const lastLine = text.split("\n").map((l) => l.trim()).filter(Boolean).at(-1);
+    if (!lastLine) return { at: info.mtime, line: "(no output yet)" };
+    const truncated = start > 0 && !text.includes("\n");
+    return { at: info.mtime, line: truncated ? `…${lastLine}` : lastLine };
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw err;

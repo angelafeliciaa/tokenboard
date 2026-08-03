@@ -51,13 +51,20 @@ test("currentVersion resolves the installed @tokenboard/cli version", () => {
 
 test("isValidIsoDate accepts real dates and rejects impossible ones", () => {
   assert.ok(isValidIsoDate("2026-08-01"));
-  assert.ok(isValidIsoDate("2024-02-29")); // leap day
-  assert.ok(!isValidIsoDate("2026-19-99")); // shape-valid but not a real date
+  assert.ok(isValidIsoDate("2024-02-29"));
+  assert.ok(!isValidIsoDate("2026-19-99"));
   assert.ok(!isValidIsoDate("2026-02-30"));
-  assert.ok(!isValidIsoDate("2025-02-29")); // not a leap year
+  assert.ok(!isValidIsoDate("2025-02-29"));
   assert.ok(!isValidIsoDate("2026-00-10"));
-  assert.ok(!isValidIsoDate("2026-8-1")); // wrong shape
+  assert.ok(!isValidIsoDate("2026-8-1"));
   assert.ok(!isValidIsoDate("nonsense"));
+});
+
+test("isValidIsoDate computes leap years directly across the full four-digit range", () => {
+  assert.ok(isValidIsoDate("0000-02-29"));
+  assert.ok(isValidIsoDate("2000-02-29"));
+  assert.ok(!isValidIsoDate("1900-02-29"));
+  assert.ok(!isValidIsoDate("0001-02-29"));
 });
 
 test("parseSinceArg passes undefined through but rejects an explicitly blank value", () => {
@@ -65,7 +72,7 @@ test("parseSinceArg passes undefined through but rejects an explicitly blank val
   assert.equal(parseSinceArg("2026-08-01"), "2026-08-01");
   assert.throws(() => parseSinceArg(""), /needs a date/);
   assert.throws(() => parseSinceArg("   "), /needs a date/);
-  assert.throws(() => parseSinceArg(true), /needs a date/); // value-less flag
+  assert.throws(() => parseSinceArg(true), /needs a date/);
 });
 
 test("parseSourcesArg passes undefined through but rejects a blank/empty list", () => {
@@ -73,5 +80,5 @@ test("parseSourcesArg passes undefined through but rejects a blank/empty list", 
   assert.deepEqual(parseSourcesArg("codex, claude-code"), ["codex", "claude-code"]);
   assert.throws(() => parseSourcesArg(""), /needs at least one tool/);
   assert.throws(() => parseSourcesArg(",, ,"), /needs at least one tool/);
-  assert.throws(() => parseSourcesArg(true), /needs at least one tool/); // value-less flag
+  assert.throws(() => parseSourcesArg(true), /needs at least one tool/);
 });

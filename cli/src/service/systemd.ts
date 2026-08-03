@@ -68,11 +68,14 @@ export const systemdBackend: SchedulerBackend = {
   },
 
   async uninstall(spec) {
-    if (!hasSystemd()) return;
-    await runCommand("systemctl", ["--user", "disable", "--now", timerUnitName(spec.label)]);
+    if (hasSystemd()) {
+      await runCommand("systemctl", ["--user", "disable", "--now", timerUnitName(spec.label)]);
+    }
     await rm(join(userUnitDir(), serviceUnitName(spec.label)), { force: true });
     await rm(join(userUnitDir(), timerUnitName(spec.label)), { force: true });
-    await runCommand("systemctl", ["--user", "daemon-reload"]);
+    if (hasSystemd()) {
+      await runCommand("systemctl", ["--user", "daemon-reload"]);
+    }
   },
 
   async status(spec) {
