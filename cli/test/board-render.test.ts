@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { renderBoardTable, renderMeLine } from "../src/render/board-table.js";
-import { sanitizeTerminalText } from "../src/render/sanitize.js";
+import { sanitizeTerminalText, safeLine } from "../src/render/sanitize.js";
 import { resolveStyle } from "../src/render/terminal-style.js";
 import type { BoardResponse, BoardEntry } from "@tokenboard/contracts";
 
@@ -82,6 +82,12 @@ test("renderMeLine summarizes rank out of total, null when absent", () => {
 test("sanitizeTerminalText removes control chars and newlines", () => {
   assert.equal(sanitizeTerminalText(`${ESC}[31mred${NEWLINE}next`), "[31mrednext");
   assert.equal(sanitizeTerminalText("plain-handle"), "plain-handle");
+});
+
+test("safeLine sanitizes interpolated values but keeps trusted static parts", () => {
+  const evil = `x${String.fromCharCode(0x1b)}[31m${String.fromCharCode(0x0a)}y`;
+  assert.equal(safeLine`handle: @${evil} done`, "handle: @x[31my done");
+  assert.equal(safeLine`n=${3} of ${10}`, "n=3 of 10");
 });
 
 test("sanitizeTerminalText removes unicode bidi and zero-width controls, keeps normal text", () => {

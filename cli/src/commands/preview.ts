@@ -10,6 +10,7 @@ import { summarize, type LocalSummary } from "../aggregate/summary.js";
 import { loadPriceTable } from "@tokenboard/cost";
 import { resolveTimeZone } from "../normalize/local-day.js";
 import { resolveStyle, styler } from "../render/terminal-style.js";
+import { safeLine } from "../render/sanitize.js";
 import { startSpinner } from "../render/spinner.js";
 import { renderLocalPreview, CLAIM_PROMPT, CLAIM_HINT } from "../render/local-preview.js";
 import { readAuthFile, resolveConfigDir } from "../config/auth-store.js";
@@ -91,7 +92,7 @@ async function offerClaim(style: ReturnType<typeof resolveStyle>): Promise<void>
 
   const auth = await readAuthFile();
   if (auth) {
-    process.stdout.write("\n" + c.dim(`✓ claimed as @${auth.handle} · run \`tokenboard sync\` to upload`) + "\n");
+    process.stdout.write("\n" + c.dim(safeLine`✓ claimed as @${auth.handle} · run \`tokenboard sync\` to upload`) + "\n");
     return;
   }
 

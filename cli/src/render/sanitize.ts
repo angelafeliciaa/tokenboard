@@ -17,3 +17,11 @@ export function sanitizeTerminalText(value: string): string {
   }
   return out;
 }
+
+export function safeLine(strings: TemplateStringsArray, ...values: unknown[]): string {
+  let result = strings[0] ?? "";
+  for (let i = 0; i < values.length; i++) {
+    result += sanitizeTerminalText(String(values[i])) + (strings[i + 1] ?? "");
+  }
+  return result;
+}

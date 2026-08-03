@@ -3,6 +3,7 @@ import { readAuthFile } from "../config/auth-store.js";
 import { fetchBoard } from "../board/transport.js";
 import { renderBoardTable, renderMeLine } from "../render/board-table.js";
 import { resolveBoardOutputStyle } from "../render/output-style.js";
+import { safeLine } from "../render/sanitize.js";
 import type { BoardViewOptions } from "./top.js";
 
 export async function runMe(options: BoardViewOptions): Promise<void> {
@@ -26,7 +27,7 @@ export async function runMe(options: BoardViewOptions): Promise<void> {
 
   const style = resolveBoardOutputStyle(options);
   if (!board.me) {
-    process.stdout.write(`  you're not on the board yet, @${auth.handle} — run \`tokenboard sync\`.\n`);
+    process.stdout.write(safeLine`  you're not on the board yet, @${auth.handle} — run \`tokenboard sync\`.\n`);
     return;
   }
 

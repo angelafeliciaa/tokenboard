@@ -8,6 +8,7 @@ import { startDeviceGrant, pollDeviceGrant } from "../claim/transport.js";
 import { openInBrowser } from "../claim/browser.js";
 import { machineHash, clientLabel } from "../claim/machine.js";
 import { writeAuthFile } from "../config/auth-store.js";
+import { safeLine } from "../render/sanitize.js";
 import { runSync } from "./sync.js";
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -21,8 +22,8 @@ export async function runClaim(): Promise<void> {
   if (process.stdout.isTTY) openInBrowser(grant.verification_url);
   out("");
   out("  Open this URL to approve this machine:");
-  out(`    ${grant.verification_url}`);
-  out(`  Code: ${grant.user_code}`);
+  out(safeLine`    ${grant.verification_url}`);
+  out(safeLine`  Code: ${grant.user_code}`);
   out("  Waiting for approval...");
   out("");
 
@@ -46,7 +47,7 @@ export async function runClaim(): Promise<void> {
         handle: result.user.handle,
         createdAt: new Date().toISOString(),
       });
-      out(`  Claimed as @${result.user.handle}. Saved credentials to ${path}`);
+      out(safeLine`  Claimed as @${result.user.handle}. Saved credentials to ${path}`);
       // Auto-sync so a fresh claim lands on the board in one step. Claiming alone writes NO
       // leaderboard entry (the global board ranks synced usage), so without this users stop
       // here and never appear. A sync failure must NOT fail the claim — credentials are saved

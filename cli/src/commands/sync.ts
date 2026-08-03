@@ -9,6 +9,7 @@ import { tzOffsetMinutes } from "../sync/tz-offset.js";
 import { chunkIdempotencyKey } from "../sync/idempotency-key.js";
 import { postSyncChunk, SyncInProgressError } from "../sync/transport.js";
 import { canonicalTool } from "../normalize/tool-name.js";
+import { sanitizeTerminalText, safeLine } from "../render/sanitize.js";
 import type { NormalizedRecord, SyncRequest, SyncResponseEnvelope } from "@tokenboard/contracts";
 
 export interface SyncOptions {
@@ -126,8 +127,8 @@ export async function runSync(options: SyncOptions = {}): Promise<void> {
       `(~$${totalCostUsd.toFixed(2)} this sync${rejected > 0 ? `, ${rejected} rejected` : ""}).\n`,
   );
   if (errorCounts.size > 0) {
-    const breakdown = [...errorCounts.entries()].map(([c, n]) => `${c} x${n}`).join(", ");
+    const breakdown = [...errorCounts.entries()].map(([c, n]) => `${sanitizeTerminalText(c)} x${n}`).join(", ");
     process.stderr.write(`  rejected: ${breakdown}\n`);
   }
-  for (const [code, n] of flagCounts) process.stderr.write(`  flag: ${code} x${n}\n`);
+  for (const [code, n] of flagCounts) process.stderr.write(safeLine`  flag: ${code} x${n}\n`);
 }
