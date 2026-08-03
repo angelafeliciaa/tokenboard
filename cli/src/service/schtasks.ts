@@ -11,6 +11,14 @@ export function buildSchtasksRunCommand(spec: ServiceSpec): string {
 
 const intervalMinutes = (spec: ServiceSpec) => Math.max(1, Math.round(spec.intervalSeconds / 60));
 
+export function parseSchtasksState(stdout: string): { loaded: boolean; detail: string } {
+  const stateMatch = /Scheduled Task State:\s*(.+)/i.exec(stdout);
+  const statusMatch = /(?:^|\n)\s*Status:\s*(.+)/i.exec(stdout);
+  const state = (stateMatch?.[1] ?? statusMatch?.[1] ?? "").trim();
+  const disabled = /disabled/i.test(state);
+  return { loaded: !disabled, detail: state ? `Task Scheduler: ${state}` : "registered with Task Scheduler" };
+}
+
 export const schtasksBackend: SchedulerBackend = {
   name: "Task Scheduler",
 
@@ -34,12 +42,11 @@ export const schtasksBackend: SchedulerBackend = {
   },
 
   async status(spec) {
-    const query = await runCommand("schtasks", ["/Query", "/TN", taskName(spec.label)]);
-    const installed = query.code === 0;
-    return {
-      installed,
-      loaded: installed,
-      detail: installed ? "registered with Task Scheduler" : "not registered with Task Scheduler",
-    };
+    const query = await runCommand("schtasks", ["/Query", "/TN", taskName(spec.label), "/V", "/FO", "LIST"]);
+    if (query.code !== 0) {
+      return { installed: false, loaded: false, detail: "not registered with Task Scheduler" };
+    }
+    const { loaded, detail } = parseSchtasksState(query.stdout);
+    return { installed: true, loaded, detail };
   },
 };

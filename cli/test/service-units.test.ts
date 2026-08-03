@@ -1,11 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { buildServiceSpec, resolveServiceLogPath, SERVICE_LABEL, SYNC_INTERVAL_SECONDS, type ServiceSpec } from "../src/service/spec.js";
+import { realpathSync } from "node:fs";
+import { buildServiceSpec, resolveServiceLogPath, resolveCliEntry, SERVICE_LABEL, SYNC_INTERVAL_SECONDS, type ServiceSpec } from "../src/service/spec.js";
 import { selectBackend } from "../src/service/backend.js";
 import { buildLaunchdPlist, launchdPlistPath } from "../src/service/launchd.js";
 import { buildServiceUnit, buildTimerUnit, serviceUnitName, timerUnitName } from "../src/service/systemd.js";
-import { taskName, buildSchtasksRunCommand } from "../src/service/schtasks.js";
+import { taskName, buildSchtasksRunCommand, parseSchtasksState } from "../src/service/schtasks.js";
 
 const spec: ServiceSpec = {
   label: SERVICE_LABEL,
@@ -27,6 +28,19 @@ test("buildServiceSpec defaults to the hourly sync job and honors overrides", ()
 
 test("resolveServiceLogPath sits beside auth.json in the config dir", () => {
   assert.ok(resolveServiceLogPath().endsWith(join("tokenboard", "service.log")));
+});
+
+test("resolveCliEntry resolves the executed script (process.argv[1]), not this module", () => {
+  const saved = process.argv[1];
+  try {
+    const realScript = join(process.cwd(), "package.json");
+    process.argv[1] = realScript;
+    assert.equal(resolveCliEntry(), realpathSync(realScript));
+    process.argv[1] = "relative/cli.js";
+    assert.match(resolveCliEntry(), /spec\.(ts|js)$/);
+  } finally {
+    process.argv[1] = saved;
+  }
 });
 
 test("selectBackend maps each OS and fails loud on the rest", () => {
@@ -74,4 +88,12 @@ test("schtasks task name is UI-friendly and run command redirects to the log", (
   assert.equal(taskName(SERVICE_LABEL), "tokenboard-sync");
   const cmd = buildSchtasksRunCommand(spec);
   assert.match(cmd, /^cmd \/c "\/opt\/node bin\/node" "\/home\/devon\/\.npm\/tokenboard\/dist\/cli\.js" "sync" >> "\/home\/devon\/\.config\/tokenboard\/service\.log" 2>&1$/);
+});
+
+test("parseSchtasksState marks a disabled task as not loaded", () => {
+  const enabled = parseSchtasksState("TaskName: \\tokenboard-sync\nScheduled Task State: Enabled\nStatus: Ready");
+  assert.equal(enabled.loaded, true);
+  const disabled = parseSchtasksState("TaskName: \\tokenboard-sync\nScheduled Task State: Disabled\nStatus: Disabled");
+  assert.equal(disabled.loaded, false);
+  assert.match(disabled.detail, /Disabled/);
 });

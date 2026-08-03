@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { filterRecordsForSync } from "../src/commands/sync.js";
+import { filterRecordsForSync, isValidIsoDate, parseSinceArg, parseSourcesArg } from "../src/commands/sync.js";
 import { currentVersion } from "../src/version.js";
 import type { NormalizedRecord } from "@tokenboard/contracts";
 
@@ -47,4 +47,31 @@ test("empty sources list is treated as no source filter", () => {
 
 test("currentVersion resolves the installed @tokenboard/cli version", () => {
   assert.match(currentVersion(), /^\d+\.\d+\.\d+/);
+});
+
+test("isValidIsoDate accepts real dates and rejects impossible ones", () => {
+  assert.ok(isValidIsoDate("2026-08-01"));
+  assert.ok(isValidIsoDate("2024-02-29")); // leap day
+  assert.ok(!isValidIsoDate("2026-19-99")); // shape-valid but not a real date
+  assert.ok(!isValidIsoDate("2026-02-30"));
+  assert.ok(!isValidIsoDate("2025-02-29")); // not a leap year
+  assert.ok(!isValidIsoDate("2026-00-10"));
+  assert.ok(!isValidIsoDate("2026-8-1")); // wrong shape
+  assert.ok(!isValidIsoDate("nonsense"));
+});
+
+test("parseSinceArg passes undefined through but rejects an explicitly blank value", () => {
+  assert.equal(parseSinceArg(undefined), undefined);
+  assert.equal(parseSinceArg("2026-08-01"), "2026-08-01");
+  assert.throws(() => parseSinceArg(""), /needs a date/);
+  assert.throws(() => parseSinceArg("   "), /needs a date/);
+  assert.throws(() => parseSinceArg(true), /needs a date/); // value-less flag
+});
+
+test("parseSourcesArg passes undefined through but rejects a blank/empty list", () => {
+  assert.equal(parseSourcesArg(undefined), undefined);
+  assert.deepEqual(parseSourcesArg("codex, claude-code"), ["codex", "claude-code"]);
+  assert.throws(() => parseSourcesArg(""), /needs at least one tool/);
+  assert.throws(() => parseSourcesArg(",, ,"), /needs at least one tool/);
+  assert.throws(() => parseSourcesArg(true), /needs at least one tool/); // value-less flag
 });

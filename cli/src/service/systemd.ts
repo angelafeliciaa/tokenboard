@@ -1,9 +1,17 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { existsSync } from "node:fs";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import type { ServiceSpec } from "./spec.js";
 import type { SchedulerBackend, ServiceStatus } from "./backend.js";
 import { runCommand } from "./exec.js";
+
+export function hasSystemd(): boolean {
+  return existsSync("/run/systemd/system");
+}
+
+const NO_SYSTEMD_MESSAGE =
+  "background sync needs systemd (systemctl --user), which this Linux system isn't running. Run `tokenboard sync` manually or from your own scheduler (cron, etc.).";
 
 const userUnitDir = () => join(homedir(), ".config", "systemd", "user");
 const unitBase = (label: string) => label.replace(/\./g, "-");
@@ -45,8 +53,10 @@ export const systemdBackend: SchedulerBackend = {
   name: "systemd",
 
   async install(spec) {
+    if (!hasSystemd()) throw new Error(NO_SYSTEMD_MESSAGE);
     const dir = userUnitDir();
     await mkdir(dir, { recursive: true });
+    await mkdir(dirname(spec.logPath), { recursive: true });
     await writeFile(join(dir, serviceUnitName(spec.label)), buildServiceUnit(spec), "utf8");
     await writeFile(join(dir, timerUnitName(spec.label)), buildTimerUnit(spec), "utf8");
 
@@ -58,6 +68,7 @@ export const systemdBackend: SchedulerBackend = {
   },
 
   async uninstall(spec) {
+    if (!hasSystemd()) return;
     await runCommand("systemctl", ["--user", "disable", "--now", timerUnitName(spec.label)]);
     await rm(join(userUnitDir(), serviceUnitName(spec.label)), { force: true });
     await rm(join(userUnitDir(), timerUnitName(spec.label)), { force: true });
@@ -65,6 +76,7 @@ export const systemdBackend: SchedulerBackend = {
   },
 
   async status(spec) {
+    if (!hasSystemd()) return { installed: false, loaded: false, detail: "systemd not available on this system" };
     const active = await runCommand("systemctl", ["--user", "is-active", timerUnitName(spec.label)]);
     const loaded = active.stdout.trim() === "active";
     const enabled = await runCommand("systemctl", ["--user", "is-enabled", timerUnitName(spec.label)]);

@@ -1,7 +1,7 @@
 import { platform } from "node:os";
 import type { ServiceSpec } from "./spec.js";
 import { launchdBackend } from "./launchd.js";
-import { systemdBackend } from "./systemd.js";
+import { systemdBackend, hasSystemd } from "./systemd.js";
 import { schtasksBackend } from "./schtasks.js";
 
 export interface ServiceStatus {
@@ -18,7 +18,9 @@ export interface SchedulerBackend {
 }
 
 export function serviceSupported(os: NodeJS.Platform = platform()): boolean {
-  return os === "darwin" || os === "linux" || os === "win32";
+  if (os === "darwin" || os === "win32") return true;
+  if (os === "linux") return hasSystemd();
+  return false;
 }
 
 export function selectBackend(os: NodeJS.Platform = platform()): SchedulerBackend {

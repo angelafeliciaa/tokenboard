@@ -1,4 +1,4 @@
-import { stat, readFile, access } from "node:fs/promises";
+import { open, access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname } from "node:path";
 import { readAuthFile, resolveConfigDir } from "../config/auth-store.js";
@@ -8,14 +8,24 @@ import { buildServiceSpec, SYNC_INTERVAL_SECONDS } from "../service/spec.js";
 
 const out = (line: string) => process.stdout.write(`${line}\n`);
 
-async function readLastRun(logPath: string): Promise<{ at: Date; line: string } | null> {
+const LOG_TAIL_BYTES = 64 * 1024;
+
+export async function readLastRun(logPath: string): Promise<{ at: Date; line: string } | null> {
+  let handle;
   try {
-    const [info, body] = await Promise.all([stat(logPath), readFile(logPath, "utf8")]);
-    const lastLine = body.split("\n").map((l) => l.trim()).filter(Boolean).at(-1);
+    handle = await open(logPath, "r");
+    const info = await handle.stat();
+    const start = Math.max(0, info.size - LOG_TAIL_BYTES);
+    const length = info.size - start;
+    const buffer = Buffer.alloc(length);
+    if (length > 0) await handle.read(buffer, 0, length, start);
+    const lastLine = buffer.toString("utf8").split("\n").map((l) => l.trim()).filter(Boolean).at(-1);
     return { at: info.mtime, line: lastLine ?? "(no output yet)" };
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw err;
+  } finally {
+    await handle?.close();
   }
 }
 

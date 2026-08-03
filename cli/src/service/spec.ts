@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
+import { join, isAbsolute } from "node:path";
+import { realpathSync } from "node:fs";
 import { resolveConfigDir } from "../config/auth-store.js";
 
 export const SERVICE_LABEL = "sh.tokenboard.sync";
@@ -20,6 +21,14 @@ export function resolveServiceLogPath(env: NodeJS.ProcessEnv = process.env): str
 }
 
 export function resolveCliEntry(): string {
+  const entry = process.argv[1];
+  if (entry && isAbsolute(entry)) {
+    try {
+      return realpathSync(entry);
+    } catch {
+      return entry;
+    }
+  }
   return fileURLToPath(import.meta.url);
 }
 

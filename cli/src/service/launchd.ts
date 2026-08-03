@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import type { ServiceSpec } from "./spec.js";
 import type { SchedulerBackend, ServiceStatus } from "./backend.js";
@@ -54,6 +54,7 @@ export const launchdBackend: SchedulerBackend = {
   async install(spec) {
     const path = launchdPlistPath(spec.label);
     await mkdir(launchAgentsDir(), { recursive: true });
+    await mkdir(dirname(spec.logPath), { recursive: true });
     await writeFile(path, buildLaunchdPlist(spec), "utf8");
 
     await runCommand("launchctl", ["bootout", guiDomain(), path]);

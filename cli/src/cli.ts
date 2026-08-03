@@ -4,7 +4,7 @@ import { runPreview } from "./commands/preview.js";
 import { runShowData } from "./commands/show-data.js";
 import { notAvailableYet } from "./commands/stub.js";
 import { runClaim } from "./commands/claim.js";
-import { runSync } from "./commands/sync.js";
+import { runSync, parseSinceArg, parseSourcesArg } from "./commands/sync.js";
 import { runServiceInstall, runServiceStatus, runServiceUninstall, runServiceDoctor } from "./commands/service.js";
 import { runWhoami } from "./commands/whoami.js";
 import { runUpgrade } from "./commands/upgrade.js";
@@ -51,12 +51,7 @@ const sync = defineCommand({
     sources: { type: "string", description: "only upload these tools (comma-separated, e.g. codex,claude-code)" },
   },
   async run({ args }) {
-    const since = typeof args.since === "string" && args.since.trim() !== "" ? args.since.trim() : undefined;
-    const sources =
-      typeof args.sources === "string" && args.sources.trim() !== ""
-        ? args.sources.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
-        : undefined;
-    await runSync({ since, sources });
+    await runSync({ since: parseSinceArg(args.since), sources: parseSourcesArg(args.sources) });
   },
 });
 

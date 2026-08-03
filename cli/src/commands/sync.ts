@@ -16,7 +16,31 @@ export interface SyncOptions {
   sources?: string[];
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+export function isValidIsoDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12) return false;
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day >= 1 && day <= daysInMonth;
+}
+
+export function parseSinceArg(raw: unknown): string | undefined {
+  if (raw === undefined) return undefined;
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (value === "") throw new Error("`--since` needs a date, e.g. `--since 2026-08-01`.");
+  return value;
+}
+
+export function parseSourcesArg(raw: unknown): string[] | undefined {
+  if (raw === undefined) return undefined;
+  const value = typeof raw === "string" ? raw : "";
+  const list = value.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  if (list.length === 0) throw new Error("`--sources` needs at least one tool, e.g. `--sources codex,claude-code`.");
+  return list;
+}
 
 export function filterRecordsForSync(records: NormalizedRecord[], options: SyncOptions): NormalizedRecord[] {
   const sources =
@@ -54,8 +78,8 @@ async function sendChunk(base: string, token: string, body: SyncRequest): Promis
 }
 
 export async function runSync(options: SyncOptions = {}): Promise<void> {
-  if (options.since && !ISO_DATE.test(options.since)) {
-    throw new Error(`--since must be a date in YYYY-MM-DD form (got: ${options.since}).`);
+  if (options.since && !isValidIsoDate(options.since)) {
+    throw new Error(`--since must be a valid date in YYYY-MM-DD form (got: ${options.since}).`);
   }
 
   const auth = await readAuthFile();
