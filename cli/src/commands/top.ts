@@ -21,6 +21,7 @@ export async function runTop(options: BoardViewOptions): Promise<void> {
     community: "global",
     window: options.window,
     metric: options.metric,
+    format: options.json ? "json" : "cli",
     limit: options.limit,
     me: auth?.handle,
   });
@@ -31,7 +32,8 @@ export async function runTop(options: BoardViewOptions): Promise<void> {
   }
 
   const style = resolveBoardOutputStyle(options);
-  process.stdout.write(renderBoardTable(board, style) + "\n");
+  const extra = board.me && !board.me.inTopN ? [board.me.entry] : [];
+  process.stdout.write(renderBoardTable(board, style, extra) + "\n");
   const meLine = renderMeLine(board, style);
   if (meLine) process.stdout.write(meLine + "\n");
 }

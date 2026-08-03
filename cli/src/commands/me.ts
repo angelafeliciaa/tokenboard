@@ -14,6 +14,7 @@ export async function runMe(options: BoardViewOptions): Promise<void> {
     community: "global",
     window: options.window,
     metric: options.metric,
+    format: options.json ? "json" : "cli",
     limit: options.limit,
     me: auth.handle,
   });

@@ -1,8 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { renderBoardTable, renderMeLine } from "../src/render/board-table.js";
+import { sanitizeTerminalText } from "../src/render/sanitize.js";
 import { resolveStyle } from "../src/render/terminal-style.js";
 import type { BoardResponse, BoardEntry } from "@tokenboard/contracts";
+
+const ESC = String.fromCharCode(0x1b);
+const NEWLINE = String.fromCharCode(0x0a);
 
 const plainAscii = resolveStyle({
   isTTY: false,
@@ -73,4 +77,20 @@ test("empty board shows a friendly note", () => {
 test("renderMeLine summarizes rank out of total, null when absent", () => {
   assert.match(renderMeLine(board({}), plainAscii)!, /#2 of 2/);
   assert.equal(renderMeLine(board({ me: null }), plainAscii), null);
+});
+
+test("sanitizeTerminalText removes control chars and newlines", () => {
+  assert.equal(sanitizeTerminalText(`${ESC}[31mred${NEWLINE}next`), "[31mrednext");
+  assert.equal(sanitizeTerminalText("plain-handle"), "plain-handle");
+});
+
+test("board table neutralizes escape/newline injection from remote handles", () => {
+  const evil = board({
+    entries: [entry({ rank: 1, handle: `${ESC}[2Jevil${NEWLINE}injected`, isMe: false })],
+    totalEntries: 1,
+    me: null,
+  });
+  const text = renderBoardTable(evil, plainAscii);
+  assert.ok(!text.includes(ESC));
+  assert.equal(text.split("\n").length, 2);
 });

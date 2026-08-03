@@ -1,5 +1,5 @@
 import { open, access } from "node:fs/promises";
-import { constants } from "node:fs";
+import { constants, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { readAuthFile, resolveConfigDir } from "../config/auth-store.js";
 import { resolveApiBase } from "../claim/api-base.js";
@@ -77,22 +77,25 @@ interface DoctorCheck {
   note: string;
 }
 
+function nearestExistingDir(start: string): string {
+  let dir = start;
+  while (!existsSync(dir)) {
+    const parent = dirname(dir);
+    if (parent === dir) return dir;
+    dir = parent;
+  }
+  return dir;
+}
+
 async function checkConfigWritable(): Promise<DoctorCheck> {
   const dir = resolveConfigDir();
+  const target = nearestExistingDir(dir);
   try {
-    await access(dir, constants.W_OK);
-    return { label: "config dir writable", status: "ok", note: dir };
+    await access(target, constants.W_OK | constants.X_OK);
+    const note = target === dir ? dir : `${dir} (created on first claim)`;
+    return { label: "config dir writable", status: "ok", note };
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-      return { label: "config dir writable", status: "fail", note: `${dir} — ${(err as Error).message}` };
-    }
-    const parent = dirname(dir);
-    try {
-      await access(parent, constants.W_OK);
-      return { label: "config dir writable", status: "ok", note: `${dir} (created on first claim)` };
-    } catch (parentErr) {
-      return { label: "config dir writable", status: "fail", note: `${parent} — ${(parentErr as Error).message}` };
-    }
+    return { label: "config dir writable", status: "fail", note: `${target} — ${(err as Error).message}` };
   }
 }
 
@@ -108,12 +111,12 @@ async function checkBackground(spec: ReturnType<typeof buildServiceSpec>): Promi
 }
 
 async function checkServerReachable(): Promise<DoctorCheck> {
-  const base = resolveApiBase();
   try {
+    const base = resolveApiBase();
     const res = await fetch(new URL(`${base}/api/v1/board?limit=1`), { signal: AbortSignal.timeout(8_000) });
     return { label: "server reachable", status: res.ok ? "ok" : "warn", note: `${base} (HTTP ${res.status})` };
   } catch (err) {
-    return { label: "server reachable", status: "warn", note: `${base} — ${(err as Error).message}` };
+    return { label: "server reachable", status: "warn", note: (err as Error).message };
   }
 }
 

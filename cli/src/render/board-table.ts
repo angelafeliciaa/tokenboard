@@ -1,7 +1,10 @@
 import stringWidth from "string-width";
 import { humanizeTokens, formatApproxUsd } from "./humanize.js";
 import { styler, type TerminalStyle } from "./terminal-style.js";
+import { sanitizeTerminalText } from "./sanitize.js";
 import type { BoardResponse, BoardEntry, BoardMetric } from "@tokenboard/contracts";
+
+const handleText = (entry: BoardEntry): string => `@${sanitizeTerminalText(entry.handle)}`;
 
 function padStartW(value: string, width: number): string {
   const gap = width - stringWidth(value);
@@ -38,7 +41,7 @@ export function renderBoardTable(
 ): string {
   const c = styler(style);
   const rows = [...board.entries, ...extraEntries];
-  const title = board.community ? board.community.name : "Global board";
+  const title = sanitizeTerminalText(board.community ? board.community.name : "Global board");
   const header = c.bold(title) + c.dim(` · ${windowLabel(board.window)} · ${board.metric}`);
 
   if (rows.length === 0) {
@@ -46,12 +49,12 @@ export function renderBoardTable(
   }
 
   const rankW = Math.max(...rows.map((e) => stringWidth(String(e.rank))));
-  const handleW = Math.max(...rows.map((e) => stringWidth(`@${e.handle}`)));
+  const handleW = Math.max(...rows.map((e) => stringWidth(handleText(e))));
   const valueW = Math.max(...rows.map((e) => stringWidth(metricCell(e, board.metric))));
 
   const lines = rows.map((entry) => {
     const rank = padStartW(String(entry.rank), rankW);
-    const handle = padEndW(`@${entry.handle}`, handleW);
+    const handle = padEndW(handleText(entry), handleW);
     const value = padStartW(metricCell(entry, board.metric), valueW);
     const delta = deltaCell(entry, style.ascii);
     const marker = entry.isMe ? c.coral(style.ascii ? ">" : "›") : " ";

@@ -3,6 +3,7 @@ import {
   type BoardResponse,
   type BoardWindow,
   type BoardMetric,
+  type BoardFormat,
 } from "@tokenboard/contracts";
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -11,6 +12,7 @@ export interface BoardParams {
   community: string;
   window: BoardWindow;
   metric: BoardMetric;
+  format: BoardFormat;
   me?: string;
   limit?: number;
 }
@@ -20,8 +22,8 @@ export async function fetchBoard(base: string, params: BoardParams): Promise<Boa
   url.searchParams.set("community", params.community);
   url.searchParams.set("window", params.window);
   url.searchParams.set("metric", params.metric);
-  url.searchParams.set("format", "cli");
-  if (params.limit) url.searchParams.set("limit", String(params.limit));
+  url.searchParams.set("format", params.format);
+  if (params.limit !== undefined) url.searchParams.set("limit", String(params.limit));
   if (params.me) url.searchParams.set("me", params.me);
 
   const res = await fetch(url, {

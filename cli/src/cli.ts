@@ -76,8 +76,8 @@ const boardArgs = {
 function boardViewOptions(args: Record<string, unknown>): BoardViewOptions {
   const window: BoardWindow = args.all ? "all" : args["30d"] ? "30d" : "7d";
   const metric: BoardMetric = args.cost ? "cost" : "tokens";
-  const parsedLimit = typeof args.limit === "string" ? Number.parseInt(args.limit, 10) : NaN;
-  const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 200) : undefined;
+  const parsedLimit = typeof args.limit === "string" && args.limit.trim() !== "" ? Number(args.limit) : NaN;
+  const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
   return {
     window,
     metric,
