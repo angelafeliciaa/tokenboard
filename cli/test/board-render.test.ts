@@ -88,7 +88,8 @@ test("sanitizeTerminalText removes unicode bidi and zero-width controls, keeps n
   const rlo = String.fromCharCode(0x202e);
   const zwsp = String.fromCharCode(0x200b);
   const bom = String.fromCharCode(0xfeff);
-  assert.equal(sanitizeTerminalText(`ev${rlo}il${zwsp}x${bom}`), "evilx");
+  const alm = String.fromCharCode(0x061c);
+  assert.equal(sanitizeTerminalText(`ev${rlo}il${zwsp}x${bom}${alm}`), "evilx");
   assert.equal(sanitizeTerminalText("café-münchen"), "café-münchen");
 });
 
