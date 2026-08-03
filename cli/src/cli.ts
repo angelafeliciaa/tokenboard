@@ -5,9 +5,12 @@ import { runShowData } from "./commands/show-data.js";
 import { notAvailableYet } from "./commands/stub.js";
 import { runClaim } from "./commands/claim.js";
 import { runSync } from "./commands/sync.js";
-import { runServiceInstall, runServiceStatus, runServiceUninstall } from "./commands/service.js";
+import { runServiceInstall, runServiceStatus, runServiceUninstall, runServiceDoctor } from "./commands/service.js";
 import { runWhoami } from "./commands/whoami.js";
 import { runUpgrade } from "./commands/upgrade.js";
+import { runTop, type BoardViewOptions } from "./commands/top.js";
+import { runMe } from "./commands/me.js";
+import type { BoardWindow, BoardMetric } from "@tokenboard/contracts";
 
 // Window flags are bare per DESIGN §14.1 (--7d, not --window=7d). In Phase 2 they're
 // cosmetic — the local preview shows all available local history — but registered so the
@@ -33,7 +36,7 @@ const stub = (name: string, phase: string, description: string) =>
   defineCommand({ meta: { name, description }, run: () => notAvailableYet(name, phase) });
 
 // Phase 4: real device-authorization claim. Phase 5: real sync. Both throw on failure ->
-// runMain exits non-zero (fail-loud). top/board/me/join stay stubs (Phase 6).
+// runMain exits non-zero (fail-loud). board/join stay stubs (Phase 6).
 const claim = defineCommand({
   meta: { name: "claim", description: "sign in with GitHub and claim this machine" },
   async run() {
@@ -64,6 +67,48 @@ const whoami = defineCommand({
   },
 });
 
+const boardArgs = {
+  "7d": { type: "boolean", description: "window: last 7 days (default)" },
+  "30d": { type: "boolean", description: "window: last 30 days" },
+  all: { type: "boolean", description: "window: all time" },
+  cost: { type: "boolean", description: "rank by ~cost instead of tokens" },
+  limit: { type: "string", description: "rows to show (max 200)" },
+  "no-color": { type: "boolean", description: "force plain output (also honors NO_COLOR)" },
+  ascii: { type: "boolean", description: "ASCII-only glyphs" },
+  json: { type: "boolean", description: "raw JSON, no rendering" },
+} as const;
+
+function boardViewOptions(args: Record<string, unknown>): BoardViewOptions {
+  const window: BoardWindow = args.all ? "all" : args["30d"] ? "30d" : "7d";
+  const metric: BoardMetric = args.cost ? "cost" : "tokens";
+  const parsedLimit = typeof args.limit === "string" ? Number.parseInt(args.limit, 10) : NaN;
+  const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 200) : undefined;
+  return {
+    window,
+    metric,
+    limit,
+    json: Boolean(args.json),
+    noColor: Boolean(args["no-color"]),
+    ascii: Boolean(args.ascii),
+  };
+}
+
+const top = defineCommand({
+  meta: { name: "top", description: "the global leaderboard" },
+  args: boardArgs,
+  async run({ args }) {
+    await runTop(boardViewOptions(args));
+  },
+});
+
+const me = defineCommand({
+  meta: { name: "me", description: "your rank on the global board" },
+  args: boardArgs,
+  async run({ args }) {
+    await runMe(boardViewOptions(args));
+  },
+});
+
 const upgrade = defineCommand({
   meta: { name: "upgrade", description: "update the CLI to the latest version and refresh the background sync" },
   async run() {
@@ -72,7 +117,7 @@ const upgrade = defineCommand({
 });
 
 const service = defineCommand({
-  meta: { name: "service", description: "manage the hourly background sync (install/status/uninstall)" },
+  meta: { name: "service", description: "manage the hourly background sync (install/status/doctor/uninstall)" },
   subCommands: {
     install: defineCommand({
       meta: { name: "install", description: "start syncing hourly in the background" },
@@ -84,6 +129,12 @@ const service = defineCommand({
       meta: { name: "status", description: "show whether the background sync is running and its last run" },
       async run() {
         await runServiceStatus();
+      },
+    }),
+    doctor: defineCommand({
+      meta: { name: "doctor", description: "diagnose auth, scheduler, last run, and server reachability" },
+      async run() {
+        await runServiceDoctor();
       },
     }),
     uninstall: defineCommand({
@@ -112,9 +163,9 @@ const main = defineCommand({
     service,
     whoami,
     upgrade,
-    top: stub("top", "Phase 6", "the global / default board"),
+    top,
+    me,
     board: stub("board", "Phase 6", "a specific community board"),
-    me: stub("me", "Phase 6", "your rank across communities"),
     join: stub("join", "Phase 6", "join a community"),
   },
   // Bare `tokenboard` = the ARCH §4.3 Phase-A local preview in Phase 2; becomes the

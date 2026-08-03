@@ -34,9 +34,12 @@ tokenboard                 # preview + claim
 tokenboard sync            # push usage now
 tokenboard sync --since 2026-08-01           # only upload usage on/after a day
 tokenboard sync --sources codex,claude-code  # only upload specific tools
+tokenboard top             # the global leaderboard (--30d / --all, --cost)
+tokenboard me              # your rank on the board
 tokenboard whoami          # show the account this machine is signed in as
 tokenboard service install # sync hourly in the background (launchd/systemd/Task Scheduler)
 tokenboard service status  # is the background sync running, and when did it last run?
+tokenboard service doctor  # diagnose auth, scheduler, last run, and server reachability
 tokenboard upgrade         # update to the latest CLI and refresh the background sync
 tokenboard show-data       # dry-run: print the exact payload before anything is sent
 ```
