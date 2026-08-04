@@ -44,6 +44,51 @@ test("ccusage map output validates against the contracts schema", () => {
   for (const r of records) assert.ok(normalizedRecordSchema.safeParse(r).success);
 });
 
+// REGRESSION: `ccusage codex daily --json` emits its per-model split as a keyed `models` OBJECT,
+// not the `modelBreakdowns` ARRAY that `claude daily` emits. Reading only the array silently
+// dropped 100% of Codex usage even though "codex" was wired into CCUSAGE_SOURCES.
+test("ccusage `models` keyed-object rows map to records (codex shape)", () => {
+  const daily = [
+    {
+      date: "2026-08-01",
+      models: {
+        "gpt-5-codex": { inputTokens: 200, outputTokens: 500, cacheReadTokens: 800, cacheCreationTokens: 0 },
+        "gpt-5.1-codex": { inputTokens: 10, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 40 },
+      },
+    },
+  ];
+  const records = aggregateByKey(ccusageDailyToRecords("codex", daily));
+  assert.equal(records.length, 2);
+  for (const r of records) assert.ok(normalizedRecordSchema.safeParse(r).success);
+
+  const byModel = new Map(records.map((r) => [r.model, r]));
+  assert.deepEqual(byModel.get("gpt-5-codex"), {
+    date: "2026-08-01",
+    tool: "codex",
+    model: "gpt-5-codex",
+    input: 200,
+    output: 500,
+    cacheRead: 800,
+    cacheCreate5m: 0,
+    cacheCreate1h: 0,
+  });
+  // combined cacheCreationTokens lands entirely in the 5m bucket (documented approximation)
+  assert.equal(byModel.get("gpt-5.1-codex")?.cacheCreate5m, 40);
+  assert.equal(byModel.get("gpt-5.1-codex")?.cacheCreate1h, 0);
+});
+
+test("a row carrying BOTH shapes prefers modelBreakdowns and never double-counts", () => {
+  const records = ccusageDailyToRecords("codex", [
+    {
+      date: "2026-08-01",
+      modelBreakdowns: [{ modelName: "gpt-5-codex", inputTokens: 200 }],
+      models: { "gpt-5-codex": { inputTokens: 200 } },
+    },
+  ]);
+  assert.equal(records.length, 1);
+  assert.equal(records[0]!.input, 200); // 200, not 400
+});
+
 test("both collectors aggregate together without key collision", () => {
   const claude = parsedLineToRecord(
     {
