@@ -61,6 +61,7 @@ export async function listMyCommunities(userId: string, viewerIsOwner: boolean):
     window: WEB_DEFAULT_WINDOW,
     metric: WEB_DEFAULT_METRIC,
     limit: 1,
+    offset: 0,
     format: "json",
   };
 

@@ -9,7 +9,7 @@ import { getViewer } from "@/lib/auth/get-viewer";
 import { getViewerMembership } from "@/lib/communities/get-membership";
 import { resolveBoardScope } from "@/lib/leaderboard/resolve-scope";
 import { assembleBoard } from "@/lib/leaderboard/assemble-board";
-import { WEB_DEFAULT_METRIC, WEB_DEFAULT_WINDOW } from "@/lib/board/web-defaults";
+import { WEB_DEFAULT_METRIC, WEB_DEFAULT_WINDOW, WEB_PAGE_SIZE } from "@/lib/board/web-defaults";
 import { ogImageUrl } from "@/lib/og/og-hash";
 import { SiteNav } from "@/components/site-nav";
 import { SiteFooter } from "@/components/site-footer";
@@ -28,14 +28,26 @@ export const dynamic = "force-dynamic";
 type Search = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
+function pageFromParam(v: string | undefined): number {
+  const n = Number.parseInt(v ?? "1", 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
 // Keyed on primitives (not the searchParams object) so generateMetadata and the page component share
 // one result via React cache() per request — otherwise the getViewer + scope + assembleBoard chain
 // runs twice per navigation.
-const loadBoard = cache(async function loadBoard(slug: string, windowParam: string, metricParam: string) {
+const loadBoard = cache(async function loadBoard(
+  slug: string,
+  windowParam: string,
+  metricParam: string,
+  offset: number,
+) {
   const parsed = boardQuerySchema.safeParse({
     community: slug,
     window: windowParam,
     metric: metricParam,
+    limit: WEB_PAGE_SIZE,
+    offset,
   });
   if (!parsed.success) return { kind: "notfound" as const };
 
@@ -57,7 +69,12 @@ const loadBoard = cache(async function loadBoard(slug: string, windowParam: stri
 });
 
 const loadBoardFromSearch = (slug: string, sp: Search) =>
-  loadBoard(slug, one(sp.window) ?? WEB_DEFAULT_WINDOW, one(sp.metric) ?? WEB_DEFAULT_METRIC);
+  loadBoard(
+    slug,
+    one(sp.window) ?? WEB_DEFAULT_WINDOW,
+    one(sp.metric) ?? WEB_DEFAULT_METRIC,
+    (pageFromParam(one(sp.page)) - 1) * WEB_PAGE_SIZE,
+  );
 
 export async function generateMetadata({
   params,
@@ -84,9 +101,12 @@ export default async function BoardPage({
   searchParams: Promise<Search>;
 }) {
   const { slug } = await params;
-  const res = await loadBoardFromSearch(slug, await searchParams);
+  const sp = await searchParams;
+  const res = await loadBoardFromSearch(slug, sp);
   if (res.kind === "outage") throw new Error("auth_unavailable");
   if (res.kind !== "ok") notFound();
+
+  const page = pageFromParam(one(sp.page));
 
   const { board, viewer } = res;
   const isGlobal = slug.toLowerCase() === "global" || slug === "";
@@ -144,7 +164,15 @@ export default async function BoardPage({
               </ul>
             )}
 
-            <Pager totalEntries={board.totalEntries} shown={board.entries.length} />
+            <Pager
+              basePath={currentPath}
+              window={board.window}
+              metric={board.metric}
+              page={page}
+              pageSize={WEB_PAGE_SIZE}
+              totalEntries={board.totalEntries}
+              shown={board.entries.length}
+            />
           </div>
 
           <aside className={styles.rail}>

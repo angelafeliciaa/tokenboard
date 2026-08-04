@@ -77,6 +77,7 @@ export async function fallbackBoard(p: {
   windowStart: string | null;
   windowEnd: string;
   limit: number;
+  offset?: number;
 }): Promise<Array<{ userId: string; score: number }>> {
   const { join } = communityFilter(p.scope);
   const orderCol = p.metric === "cost" ? sql`sum(udt.cost_usd)` : sql`sum(udt.tokens)`;
@@ -91,7 +92,7 @@ export async function fallbackBoard(p: {
     group by udt.user_id
     having ${orderCol} > 0
     order by ${orderCol} desc, udt.user_id asc
-    limit ${p.limit}
+    limit ${p.limit} offset ${p.offset ?? 0}
   `)) as unknown as Array<{ user_id: string; tokens: string; cost_usd: string }>;
   return rows.map((r) => ({
     userId: r.user_id,
