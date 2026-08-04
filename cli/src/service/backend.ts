@@ -10,9 +10,14 @@ export interface ServiceStatus {
   detail: string;
 }
 
+export interface InstallResult {
+  firstRunStarted: boolean;
+  firstRunDetail?: string;
+}
+
 export interface SchedulerBackend {
   readonly name: string;
-  install(spec: ServiceSpec): Promise<void>;
+  install(spec: ServiceSpec): Promise<InstallResult>;
   uninstall(spec: ServiceSpec): Promise<void>;
   status(spec: ServiceSpec): Promise<ServiceStatus>;
 }

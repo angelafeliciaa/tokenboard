@@ -5,6 +5,8 @@ import type { ServiceSpec } from "./spec.js";
 import type { SchedulerBackend } from "./backend.js";
 import { runCommand } from "./exec.js";
 
+const NOT_LOADED = /no such process|could not find|not find/i;
+
 const launchAgentsDir = () => join(homedir(), "Library", "LaunchAgents");
 export const launchdPlistPath = (label: string) => join(launchAgentsDir(), `${label}.plist`);
 
@@ -62,12 +64,18 @@ export const launchdBackend: SchedulerBackend = {
     if (boot.code !== 0) {
       throw new Error(`launchctl bootstrap failed: ${boot.stderr.trim() || boot.stdout.trim() || `exit ${boot.code}`}`);
     }
-    await runCommand("launchctl", ["kickstart", `${guiDomain()}/${spec.label}`]);
+    const kick = await runCommand("launchctl", ["kickstart", `${guiDomain()}/${spec.label}`]);
+    return kick.code === 0
+      ? { firstRunStarted: true }
+      : { firstRunStarted: false, firstRunDetail: kick.stderr.trim() || kick.stdout.trim() || `exit ${kick.code}` };
   },
 
   async uninstall(spec) {
     const path = launchdPlistPath(spec.label);
-    await runCommand("launchctl", ["bootout", guiDomain(), path]);
+    const boot = await runCommand("launchctl", ["bootout", guiDomain(), path]);
+    if (boot.code !== 0 && !NOT_LOADED.test(`${boot.stderr}${boot.stdout}`)) {
+      throw new Error(`launchctl bootout failed (job may still be running): ${boot.stderr.trim() || boot.stdout.trim() || `exit ${boot.code}`}`);
+    }
     await rm(path, { force: true });
   },
 

@@ -14,19 +14,24 @@ function cadenceLabel(seconds: number): string {
   return `every ${Math.round(seconds / 60)} min`;
 }
 
+export function tailRange(fileSize: number, maxBytes: number = LOG_TAIL_BYTES): { start: number; length: number } {
+  const start = Math.max(0, fileSize - maxBytes);
+  return { start, length: fileSize - start };
+}
+
 export async function readLastRun(logPath: string): Promise<{ at: Date; line: string } | null> {
   let handle;
   try {
     handle = await open(logPath, "r");
     const info = await handle.stat();
-    const start = Math.max(0, info.size - LOG_TAIL_BYTES);
-    const length = info.size - start;
+    const { start, length } = tailRange(info.size);
     const buffer = Buffer.alloc(length);
     const bytesRead = length > 0 ? (await handle.read(buffer, 0, length, start)).bytesRead : 0;
     const text = buffer.subarray(0, bytesRead).toString("utf8");
     const lastLine = text.split("\n").map((l) => l.trim()).filter(Boolean).at(-1);
     if (!lastLine) return { at: info.mtime, line: "(no output yet)" };
-    const truncated = start > 0 && !text.includes("\n");
+    const hasInteriorNewline = text.replace(/\n+$/, "").includes("\n");
+    const truncated = start > 0 && !hasInteriorNewline;
     return { at: info.mtime, line: truncated ? `…${lastLine}` : lastLine };
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
@@ -39,12 +44,22 @@ export async function readLastRun(logPath: string): Promise<{ at: Date; line: st
 export async function runServiceInstall(): Promise<void> {
   const backend = selectBackend();
   const spec = buildServiceSpec();
-  await backend.install(spec);
+  const result = await backend.install(spec);
 
   out(`  tokenboard service — installed. Syncing ${cadenceLabel(SYNC_INTERVAL_SECONDS)} via ${backend.name}.`);
   out(`  Logs: ${spec.logPath}`);
 
-  if (!(await readAuthFile())) {
+  if (!result.firstRunStarted) {
+    out(`  Note: couldn't start the first sync now (${result.firstRunDetail ?? "unknown error"}); it will still run on schedule.`);
+  }
+
+  let signedIn: boolean;
+  try {
+    signedIn = (await readAuthFile()) !== null;
+  } catch {
+    signedIn = false;
+  }
+  if (!signedIn) {
     out("  Not signed in yet — run `tokenboard claim` so the background sync has credentials.");
   }
 }

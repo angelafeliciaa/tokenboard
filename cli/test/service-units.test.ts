@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { platform } from "node:os";
 import { realpathSync } from "node:fs";
 import { buildServiceSpec, resolveServiceLogPath, resolveCliEntry, SERVICE_LABEL, SYNC_INTERVAL_SECONDS, type ServiceSpec } from "../src/service/spec.js";
 import { selectBackend } from "../src/service/backend.js";
@@ -19,24 +20,31 @@ const spec: ServiceSpec = {
 
 test("the default sync job runs daily", () => {
   assert.equal(SYNC_INTERVAL_SECONDS, 86_400);
-  const s = buildServiceSpec({ nodePath: "/x/node", cliEntry: "/x/cli.js" }, { XDG_CONFIG_HOME: "/cfg" } as NodeJS.ProcessEnv);
+  const isWin = platform() === "win32";
+  const configRoot = isWin ? "C:\\cfg" : "/cfg";
+  const env = (isWin ? { APPDATA: configRoot } : { XDG_CONFIG_HOME: configRoot }) as NodeJS.ProcessEnv;
+  const s = buildServiceSpec({ nodePath: "/x/node", cliEntry: "/x/cli.js" }, env);
   assert.equal(s.label, SERVICE_LABEL);
   assert.deepEqual(s.args, ["sync"]);
   assert.equal(s.intervalSeconds, 86_400);
-  assert.equal(s.logPath, "/cfg/tokenboard/service.log");
+  assert.equal(s.logPath, join(configRoot, "tokenboard", "service.log"));
 });
 
 test("resolveServiceLogPath sits beside auth.json in the config dir", () => {
   assert.ok(resolveServiceLogPath().endsWith(join("tokenboard", "service.log")));
 });
 
-test("resolveCliEntry resolves the executed script (process.argv[1]), not this module", () => {
+test("resolveCliEntry resolves the executed script (process.argv[1]) to an absolute path", () => {
   const saved = process.argv[1];
   try {
     const realScript = join(process.cwd(), "package.json");
     process.argv[1] = realScript;
     assert.equal(resolveCliEntry(), realpathSync(realScript));
+
     process.argv[1] = "relative/cli.js";
+    assert.equal(resolveCliEntry(), resolve(process.cwd(), "relative/cli.js"));
+
+    process.argv[1] = "";
     assert.match(resolveCliEntry(), /spec\.(ts|js)$/);
   } finally {
     process.argv[1] = saved;

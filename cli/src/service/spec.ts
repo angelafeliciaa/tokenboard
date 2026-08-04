@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { join, isAbsolute } from "node:path";
+import { join, isAbsolute, resolve } from "node:path";
 import { realpathSync } from "node:fs";
 import { resolveConfigDir } from "../config/auth-store.js";
 
@@ -22,11 +22,12 @@ export function resolveServiceLogPath(env: NodeJS.ProcessEnv = process.env): str
 
 export function resolveCliEntry(): string {
   const entry = process.argv[1];
-  if (entry && isAbsolute(entry)) {
+  if (entry) {
+    const abs = isAbsolute(entry) ? entry : resolve(process.cwd(), entry);
     try {
-      return realpathSync(entry);
+      return realpathSync(abs);
     } catch {
-      return entry;
+      return abs;
     }
   }
   return fileURLToPath(import.meta.url);

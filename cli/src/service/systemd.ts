@@ -65,11 +65,18 @@ export const systemdBackend: SchedulerBackend = {
     if (enable.code !== 0) {
       throw new Error(`systemctl enable failed: ${enable.stderr.trim() || enable.stdout.trim() || `exit ${enable.code}`}`);
     }
+    const start = await runCommand("systemctl", ["--user", "start", serviceUnitName(spec.label)]);
+    return start.code === 0
+      ? { firstRunStarted: true }
+      : { firstRunStarted: false, firstRunDetail: start.stderr.trim() || start.stdout.trim() || `exit ${start.code}` };
   },
 
   async uninstall(spec) {
     if (hasSystemd()) {
-      await runCommand("systemctl", ["--user", "disable", "--now", timerUnitName(spec.label)]);
+      const disable = await runCommand("systemctl", ["--user", "disable", "--now", timerUnitName(spec.label)]);
+      if (disable.code !== 0 && !/not loaded|no such file|does not exist/i.test(`${disable.stderr}${disable.stdout}`)) {
+        throw new Error(`systemctl disable failed (timer may still be active): ${disable.stderr.trim() || disable.stdout.trim() || `exit ${disable.code}`}`);
+      }
     }
     await rm(join(userUnitDir(), serviceUnitName(spec.label)), { force: true });
     await rm(join(userUnitDir(), timerUnitName(spec.label)), { force: true });
