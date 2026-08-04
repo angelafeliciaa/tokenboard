@@ -11,7 +11,7 @@ import { postSyncChunk, SyncInProgressError } from "../sync/transport.js";
 import type { SyncRequest, SyncResponseEnvelope } from "@tokenboard/contracts";
 
 const CHUNK_SIZE = 500;
-const CLI_VERSION = "0.0.1"; // mirror package.json; X-Tokenboard-CLI header.
+const CLI_VERSION = "0.1.7"; // MUST mirror package.json `version`; sent as the X-Tokenboard-CLI header.
 const IN_PROGRESS_RETRIES = 3;
 const IN_PROGRESS_BACKOFF_MS = 1_000;
 
