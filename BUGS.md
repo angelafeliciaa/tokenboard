@@ -68,7 +68,7 @@ Status key: 🔴 open · 🟡 investigating · 🟢 fix pushed (needs verify) ·
   against real ccusage@20 with a synthetic `~/.codex/sessions` rollout: `collectCcusage()` went from
   `[]` → one `codex`/`gpt-5-codex` record; all codex models are priced in the LiteLLM snapshot.
   Note: `reasoningOutputTokens` is a SUBSET of `outputTokens` (not additive) — do not sum it.
-  Follow-up: the other 6 long-tail sources (opencode, amp, droid, goose, gemini, copilot, qwen) had
+  Follow-up: the other 7 long-tail sources (opencode, amp, droid, goose, gemini, copilot, qwen) had
   no local data on this machine, so their shape is unobserved — the fix handles either shape, but
   confirm on a machine that actually has their logs.
 

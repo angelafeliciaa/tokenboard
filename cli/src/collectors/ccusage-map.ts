@@ -30,8 +30,15 @@ function count(n: number | undefined): number {
 // verified against ccusage@20: `claude daily` emits `modelBreakdowns`, `codex daily` emits `models`):
 //   modelBreakdowns: [{ modelName: "x", ... }]     <- claude, and the combined `daily` report
 //   models:          { "x": { ... } }              <- codex
-// Normalize both to one breakdown list. If a row somehow carries both, `modelBreakdowns` wins and
-// `models` is ignored — never summed, which would double-count the same tokens.
+// Normalize both to one breakdown list, preferring whichever is NON-EMPTY. Exactly one is populated
+// in every shape observed from ccusage@20, so the both-populated case is purely defensive: there
+// `modelBreakdowns` wins and `models` is ignored — never summed, which would double-count.
+//
+// The non-empty test (not a field-presence test) is deliberate. An empty `modelBreakdowns: []`
+// alongside a populated `models` is treated as "read models", because the failure this whole path
+// exists to prevent is silently dropping a source's usage. Preferring a present-but-empty array
+// would reintroduce that exact bug for any future source emitting both. Neither populated -> [],
+// which maps to zero records either way, so the ordering only matters when data is actually there.
 function modelBreakdownsOf(row: CcusageDailyRow): CcusageModelBreakdown[] {
   if (row.modelBreakdowns && row.modelBreakdowns.length > 0) return row.modelBreakdowns;
   if (!row.models) return [];

@@ -89,6 +89,21 @@ test("a row carrying BOTH shapes prefers modelBreakdowns and never double-counts
   assert.equal(records[0]!.input, 200); // 200, not 400
 });
 
+// An EMPTY modelBreakdowns next to a populated models map must read `models` — preferring the
+// present-but-empty array would silently drop the usage, which is the whole bug this path prevents.
+test("empty modelBreakdowns + populated models -> reads models (never a silent drop)", () => {
+  const records = ccusageDailyToRecords("codex", [
+    { date: "2026-08-01", modelBreakdowns: [], models: { "gpt-5-codex": { inputTokens: 200 } } },
+  ]);
+  assert.equal(records.length, 1);
+  assert.equal(records[0]!.input, 200);
+});
+
+test("neither shape populated -> no records", () => {
+  assert.deepEqual(ccusageDailyToRecords("codex", [{ date: "2026-08-01", modelBreakdowns: [], models: {} }]), []);
+  assert.deepEqual(ccusageDailyToRecords("codex", [{ date: "2026-08-01" }]), []);
+});
+
 test("both collectors aggregate together without key collision", () => {
   const claude = parsedLineToRecord(
     {
