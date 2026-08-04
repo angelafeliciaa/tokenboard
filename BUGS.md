@@ -58,6 +58,20 @@ Status key: 🔴 open · 🟡 investigating · 🟢 fix pushed (needs verify) ·
   Note: `community_email_domains.domain` is globally unique (one community per domain);
   decide whether to block generic domains (gmail.com etc.).
 
+## Collectors
+- 🟢 **Codex usage silently dropped** — FIXED (`cli/src/collectors/ccusage-map.ts`). `codex` was
+  already in `CCUSAGE_SOURCES` and `ccusage codex daily` exits 0, but every record was discarded:
+  ccusage@20 emits the per-model split in TWO shapes, and we only read one. `claude daily` (and the
+  combined `daily` report) emit `modelBreakdowns: [{ modelName, … }]`; **`codex daily` emits
+  `models: { "gpt-5-codex": { … } }`** — a keyed object. Mapper now reads both, preferring
+  `modelBreakdowns` when a row carries both (never summing → no double-count). Verified end-to-end
+  against real ccusage@20 with a synthetic `~/.codex/sessions` rollout: `collectCcusage()` went from
+  `[]` → one `codex`/`gpt-5-codex` record; all codex models are priced in the LiteLLM snapshot.
+  Note: `reasoningOutputTokens` is a SUBSET of `outputTokens` (not additive) — do not sum it.
+  Follow-up: the other 7 long-tail sources (opencode, amp, droid, goose, gemini, copilot, qwen) had
+  no local data on this machine, so their shape is unobserved — the fix handles either shape, but
+  confirm on a machine that actually has their logs.
+
 ## Performance
 - 🟡 **CLI bare preview takes ~8s** — measured breakdown (364MB / 1,673 Claude JSONL files,
   this machine): `collectClaudeCodeLines` (read+parse) **~3.2s**, `collectCcusage` probe
