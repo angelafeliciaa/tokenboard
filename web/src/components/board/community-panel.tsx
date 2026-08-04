@@ -2,10 +2,10 @@
 // (name, member count, a join-policy hint) + a Phase-8 INVITE FRIENDS stub button. The prototype's
 // invite-code pill is intentionally omitted: join_code is not in the CommunityMeta contract and
 // surfacing it is Phase-8 invite work (flagged in the PR).
-import Link from "next/link";
 import type { CommunityMeta } from "@tokenboard/contracts";
 import type { ViewerMembership } from "@/lib/communities/get-membership";
 import { LeaveCommunity } from "./leave-community";
+import { InviteFriends } from "./invite-friends";
 import styles from "./community-panel.module.css";
 
 function policyHint(c: CommunityMeta): string {
@@ -17,9 +17,11 @@ function policyHint(c: CommunityMeta): string {
 export function CommunityPanel({
   community,
   membership,
+  inviteCode,
 }: {
   community: CommunityMeta;
   membership: ViewerMembership | null;
+  inviteCode: string | null;
 }) {
   return (
     <>
@@ -36,13 +38,12 @@ export function CommunityPanel({
           </div>
         </dl>
       </section>
-      <section className={styles.panel}>
-        {/* PHASE-8 STUB — real invite generation is Phase 8; this links to a marked placeholder. */}
-        <Link className={styles.inviteBtn} href="/communities?soon=invite">
-          Invite Friends
-        </Link>
-        {membership && <LeaveCommunity communityId={membership.communityId} name={community.name} />}
-      </section>
+      {membership && (
+        <section className={styles.panel}>
+          {inviteCode && <InviteFriends code={inviteCode} />}
+          <LeaveCommunity communityId={membership.communityId} name={community.name} />
+        </section>
+      )}
     </>
   );
 }

@@ -73,6 +73,62 @@
   background: var(--coral-hi);
 }
 
+.invite {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.inviteHint {
+  font-family: var(--term);
+  font-size: var(--fs-14);
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.inviteCodeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inviteCodeLabel {
+  font-family: var(--term);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--ink-4-text);
+}
+.inviteCode {
+  flex: 1;
+  font-family: var(--term);
+  font-size: var(--fs-18);
+  letter-spacing: 3px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--frame-hi);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+.inviteCopyCode {
+  font-family: var(--term);
+  font-size: var(--fs-13);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid var(--frame-hi);
+  border-radius: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition:
+    color 0.12s,
+    border-color 0.12s;
+}
+.inviteCopyCode:hover {
+  color: var(--coral);
+  border-color: var(--coral-hi);
+}
+
 .leaveWrap {
   margin-top: 12px;
 }

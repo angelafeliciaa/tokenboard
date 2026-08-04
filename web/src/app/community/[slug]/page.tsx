@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import { boardQuerySchema } from "@tokenboard/contracts";
 import { getViewer } from "@/lib/auth/get-viewer";
 import { getViewerMembership } from "@/lib/communities/get-membership";
+import { getInviteCode } from "@/lib/communities/get-invite-code";
 import { resolveBoardScope } from "@/lib/leaderboard/resolve-scope";
 import { assembleBoard } from "@/lib/leaderboard/assemble-board";
 import { WEB_DEFAULT_METRIC, WEB_DEFAULT_WINDOW } from "@/lib/board/web-defaults";
@@ -98,6 +99,8 @@ export default async function BoardPage({
   const pinnedMe = board.me && board.me.inTopN === false ? board.me.entry : null;
   const membership =
     viewer && board.community ? await getViewerMembership(viewer.userId, board.community.slug) : null;
+  const inviteCode =
+    membership && board.community?.joinPolicy === "code" ? await getInviteCode(board.community.slug) : null;
 
   return (
     <div className={`${styles.surfaceBoardBase} ${styles.surfaceBoardArcade}`}>
@@ -156,7 +159,7 @@ export default async function BoardPage({
               aliasCompany={aliasCompany}
             />
             {board.community && (
-              <CommunityPanel community={board.community} membership={membership} />
+              <CommunityPanel community={board.community} membership={membership} inviteCode={inviteCode} />
             )}
           </aside>
         </div>
