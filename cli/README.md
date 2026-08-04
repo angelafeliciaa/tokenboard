@@ -2,13 +2,16 @@
 
 A leaderboard for your agentic-coding token usage — race your friends, not strangers.
 
-> **Status:** early release — local preview only. Sign-in, public boards, and
-> syncing land in upcoming releases. Follow along at
+> **Status:** early release. `npx @tokenboard/cli` previews locally with no
+> login; `claim` + `sync` land you on the public board at
 > [tokenboard.sh](https://tokenboard.sh).
 
 ```bash
 npx @tokenboard/cli            # local preview: your token usage + a rough $ estimate
-npx @tokenboard/cli show-data  # dry-run: exactly what a future sync would upload
+tokenboard claim               # sign in with GitHub and claim this machine
+tokenboard sync                # push usage now
+tokenboard service install     # sync once a day in the background
+tokenboard show-data           # dry-run: exactly what a sync would upload
 ```
 
 ## What it does today
@@ -22,9 +25,10 @@ npx @tokenboard/cli show-data  # dry-run: exactly what a future sync would uploa
 
 ## Privacy
 
-Runs **fully offline** — nothing is uploaded and no account is created. The only
-outbound traffic is `npx` fetching the pinned `ccusage` package (an npm install, not
-your usage data); with no network it's skipped and Claude Code still renders.
+The bare `npx @tokenboard/cli` preview runs **fully offline** — nothing is uploaded
+and no account is created. Only after you `claim` + `sync` (manually or via the daily
+`service`) does it upload **aggregate token counts** per `(day, tool, model)` — never
+prompts, code, file paths, or repo names. Run `show-data` to see the exact payload first.
 
 MIT licensed. Credits [ccusage](https://github.com/ryoppippi/ccusage) and
 [LiteLLM](https://github.com/BerriAI/litellm) — see `NOTICES.md`.
