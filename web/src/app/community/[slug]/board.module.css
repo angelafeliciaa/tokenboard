@@ -97,8 +97,9 @@
   flex-direction: column;
 }
 
-/* Empty placeholder row: keeps the card a constant height when a page has <10 entries, so the board
-   never jumps position or resizes. Blank (no divider) — matches a real row's height. */
+/* Empty placeholder row: keeps the card a constant height when a page holds fewer than a full
+   page of entries, so the board never jumps position or resizes. Blank (no divider) — matches a
+   real row's height. */
 .fillerRow {
   height: 45px;
 }

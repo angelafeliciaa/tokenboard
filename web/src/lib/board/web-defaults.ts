@@ -10,7 +10,7 @@ export const WEB_DEFAULT_METRIC: BoardMetric = "cost";
 export const WEB_DEFAULT_WINDOW: BoardWindow = "all";
 
 // Rows per page on the web board. The board pages with ?page= (page N => offset (N-1)*WEB_PAGE_SIZE).
-export const WEB_PAGE_SIZE = 10;
+export const WEB_PAGE_SIZE = 12;
 
 // Uppercase tab/label text for a window (the prototype's "7 DAYS" / "30 DAYS" / "ALL-TIME").
 const WINDOW_LABELS: Record<BoardWindow, string> = {

@@ -131,7 +131,7 @@ export default async function BoardPage({
   const showRail = hasStanding || board.community != null;
 
   // Filler rows keep the card height CONSISTENT ACROSS PAGES, but never taller than the board's real
-  // size: pad each page up to min(pageSize, totalEntries) rows. A full 10-per-page board pads to 10;
+  // size: pad each page up to min(pageSize, totalEntries) rows. A full page pads to WEB_PAGE_SIZE;
   // a 3-entry board pads to 3; a 1-member board shows 1 row (no empty box).
   const rowsThisPage = board.entries.length + (pinnedMe ? 1 : 0);
   const targetRows = Math.min(WEB_PAGE_SIZE, board.totalEntries);
