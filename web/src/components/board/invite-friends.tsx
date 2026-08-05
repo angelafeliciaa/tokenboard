@@ -1,22 +1,22 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { inviteLink } from "@/lib/communities/invite-link";
 import styles from "./community-panel.module.css";
 
 function execCommandCopy(text: string): boolean {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
   try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
     ta.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    return ok;
+    return document.execCommand("copy");
   } catch {
     return false;
+  } finally {
+    document.body.removeChild(ta);
   }
 }
 
@@ -35,13 +35,18 @@ async function copyToClipboard(text: string): Promise<boolean> {
 export function InviteFriends({ code }: { code: string }) {
   const [copied, setCopied] = useState<"link" | "code" | null>(null);
   const [manual, setManual] = useState<string | null>(null);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function copy(which: "link" | "code", text: string) {
     const ok = await copyToClipboard(text);
     if (ok) {
       setManual(null);
       setCopied(which);
-      window.setTimeout(() => setCopied((current) => (current === which ? null : current)), 1300);
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+      resetTimer.current = setTimeout(() => {
+        setCopied(null);
+        resetTimer.current = null;
+      }, 1300);
     } else {
       setCopied(null);
       setManual(text);
