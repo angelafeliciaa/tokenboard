@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
   if (!gate.ok) return gate.response;
 
   const board = await assembleBoard({
-    query: { community: "global", window: "all", metric: "cost", limit: 200, format: "json" },
+    query: { community: "global", window: "all", metric: "cost", limit: 200, offset: 0, format: "json" },
     scope: scopeForCommunity(id),
     community: null,
     meUserId: null,

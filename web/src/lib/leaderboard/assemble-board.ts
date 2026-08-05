@@ -24,6 +24,7 @@ import {
 import { windowTotalsForUsers } from "./window-sums-batch";
 
 const OVERFETCH = 32; // buffer so banned drops don't shrink the page below limit.
+const MAX_BACKFILL_CHUNKS = 8;
 
 function toDisplayUnit(metric: BoardQuery["metric"], score: number): number {
   return metric === "cost" ? microsToUsd2dp(score) : score;
@@ -48,20 +49,33 @@ export async function assembleBoard(params: {
   const now = new Date();
   const { windowStart, windowEnd } = windowBounds(query.window, now);
 
-  // (2) top-N from Redis (over-fetch for banned filtering). Flat [member, score, ...].
-  const flat = (await redis.zrange(key, 0, query.limit - 1 + OVERFETCH, {
-    rev: true,
-    withScores: true,
-  })) as Array<string | number>;
-
+  const CHUNK = query.limit + OVERFETCH;
   let ranked: Array<{ userId: string; score: number }> = [];
-  for (let i = 0; i < flat.length; i += 2) {
-    ranked.push({ userId: String(flat[i]), score: Number(flat[i + 1]) });
+  let cursor = query.offset;
+  for (let chunks = 0; ranked.length < query.limit && chunks < MAX_BACKFILL_CHUNKS; chunks++) {
+    const flat = (await redis.zrange(key, cursor, cursor + CHUNK - 1, {
+      rev: true,
+      withScores: true,
+    })) as Array<string | number>;
+    if (flat.length === 0) break;
+    const chunk: Array<{ userId: string; score: number }> = [];
+    for (let i = 0; i < flat.length; i += 2) {
+      chunk.push({ userId: String(flat[i]), score: Number(flat[i + 1]) });
+    }
+    const allowed = new Set(
+      (
+        await db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(inArray(users.id, chunk.map((c) => c.userId)), isNull(users.bannedAt)))
+      ).map((r) => r.id),
+    );
+    for (const c of chunk) if (allowed.has(c.userId)) ranked.push(c);
+    cursor += CHUNK;
   }
 
   let usedFallback = false;
   if (ranked.length === 0) {
-    // Empty/missing board key -> Postgres windowed aggregate (NOT an error). banned-excluded.
     usedFallback = true;
     ranked = await fallbackBoard({
       scope,
@@ -69,19 +83,8 @@ export async function assembleBoard(params: {
       windowStart,
       windowEnd,
       limit: query.limit,
+      offset: query.offset,
     });
-  } else {
-    // banned exclusion (Redis path): ONE query.
-    const ids = ranked.map((r) => r.userId);
-    const allowed = new Set(
-      (
-        await db
-          .select({ id: users.id })
-          .from(users)
-          .where(and(inArray(users.id, ids), isNull(users.bannedAt)))
-      ).map((r) => r.id),
-    );
-    ranked = ranked.filter((r) => allowed.has(r.userId));
   }
   ranked = ranked.slice(0, query.limit);
   const ids = ranked.map((r) => r.userId);
@@ -168,7 +171,7 @@ export async function assembleBoard(params: {
     };
   };
 
-  const entries: BoardEntry[] = ranked.map((r, i) => toEntry(r.userId, r.score, i + 1));
+  const entries: BoardEntry[] = ranked.map((r, i) => toEntry(r.userId, r.score, query.offset + i + 1));
 
   // (7) me union
   let me: BoardMe = null;
