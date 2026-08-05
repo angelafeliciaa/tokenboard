@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { BoardWindow, BoardMetric } from "@tokenboard/contracts";
+import { MAX_BOARD_OFFSET, type BoardWindow, type BoardMetric } from "@tokenboard/contracts";
 import { pageWindow, totalPages } from "@/lib/board/page-window";
 import styles from "./pager.module.css";
 
@@ -27,7 +27,8 @@ export function Pager({
 }) {
   if (shown === 0) return null;
 
-  const pages = totalPages(totalEntries, pageSize);
+  const maxReachablePage = Math.floor(MAX_BOARD_OFFSET / pageSize) + 1;
+  const pages = Math.min(totalPages(totalEntries, pageSize), maxReachablePage);
   const current = Math.min(Math.max(1, page), pages);
   const offset = (current - 1) * pageSize;
   const from = offset + 1;

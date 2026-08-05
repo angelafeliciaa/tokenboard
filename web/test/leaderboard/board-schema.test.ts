@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boardResponseSchema, boardQuerySchema } from "@tokenboard/contracts";
+import { boardResponseSchema, boardQuerySchema, MAX_BOARD_OFFSET } from "@tokenboard/contracts";
 
 // IMPLEMENTATION §5 must-test: a board response validates against the canonical §7.2 schema.
 const fullEntry = {
@@ -80,6 +80,8 @@ test("boardQuerySchema defaults offset to 0 and coerces query strings", () => {
 });
 
 test("boardQuerySchema rejects a negative or over-max offset", () => {
+  assert.equal(MAX_BOARD_OFFSET, 100_000);
+  assert.equal(boardQuerySchema.safeParse({ offset: String(MAX_BOARD_OFFSET) }).success, true);
   assert.equal(boardQuerySchema.safeParse({ offset: "-1" }).success, false);
-  assert.equal(boardQuerySchema.safeParse({ offset: "100001" }).success, false);
+  assert.equal(boardQuerySchema.safeParse({ offset: String(MAX_BOARD_OFFSET + 1) }).success, false);
 });

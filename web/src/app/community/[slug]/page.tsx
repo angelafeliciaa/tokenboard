@@ -3,8 +3,8 @@
 // fetch-to-self: no self-HTTP hop, no second cookie round-trip, full BoardResponse types. The window
 // tabs + metric toggle are client leaves that drive ?window=/?metric=, so this re-renders server-side.
 import { cache } from "react";
-import { notFound } from "next/navigation";
-import { boardQuerySchema } from "@tokenboard/contracts";
+import { notFound, redirect } from "next/navigation";
+import { boardQuerySchema, MAX_BOARD_OFFSET } from "@tokenboard/contracts";
 import { getViewer } from "@/lib/auth/get-viewer";
 import { getViewerMembership } from "@/lib/communities/get-membership";
 import { resolveBoardScope } from "@/lib/leaderboard/resolve-scope";
@@ -73,7 +73,7 @@ const loadBoardFromSearch = (slug: string, sp: Search) =>
     slug,
     one(sp.window) ?? WEB_DEFAULT_WINDOW,
     one(sp.metric) ?? WEB_DEFAULT_METRIC,
-    (pageFromParam(one(sp.page)) - 1) * WEB_PAGE_SIZE,
+    Math.min((pageFromParam(one(sp.page)) - 1) * WEB_PAGE_SIZE, MAX_BOARD_OFFSET),
   );
 
 export async function generateMetadata({
@@ -111,6 +111,15 @@ export default async function BoardPage({
   const { board, viewer } = res;
   const isGlobal = slug.toLowerCase() === "global" || slug === "";
   const currentPath = isGlobal ? "/global" : `/community/${slug}`;
+
+  const lastPage = Math.max(
+    1,
+    Math.min(Math.ceil(board.totalEntries / WEB_PAGE_SIZE), Math.floor(MAX_BOARD_OFFSET / WEB_PAGE_SIZE) + 1),
+  );
+  if (page > lastPage) {
+    const params = new URLSearchParams({ window: board.window, metric: board.metric, page: String(lastPage) });
+    redirect(`${currentPath}?${params.toString()}`);
+  }
 
   // COMPANY-board privacy gate (DESIGN §7.2): there's no opt-in/alias column yet, so until Phase 8
   // lands it, company boards alias every row by rank rather than leak real handles.
