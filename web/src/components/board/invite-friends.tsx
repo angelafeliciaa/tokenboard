@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { inviteLink } from "@/lib/communities/invite-link";
 import styles from "./community-panel.module.css";
 
@@ -36,6 +36,10 @@ export function InviteFriends({ code }: { code: string }) {
   const [copied, setCopied] = useState<"link" | "code" | null>(null);
   const [manual, setManual] = useState<string | null>(null);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+  }, []);
 
   async function copy(which: "link" | "code", text: string) {
     const ok = await copyToClipboard(text);
