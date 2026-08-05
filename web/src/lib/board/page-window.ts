@@ -20,8 +20,10 @@ export type PageSlot = number | typeof PAGE_GAP;
 
 // Pages pinned at each end.
 const BOUNDARY_COUNT = 1;
-// Pages either side of the current one. 1 => a 3-wide moving window (prev, current, next).
-const SIBLING_COUNT = 1;
+// Pages either side of the current one. 0 => the current page alone between the gaps, capping the
+// row at 5 cells ("1 … 10 … 20"). MUI/AntD default to 1 (7 cells), but a compact board reads better
+// with fewer targets — you step with ◀ ▶ and the pinned ends cover the long jumps.
+const SIBLING_COUNT = 0;
 
 // The total number of numbered cells we aim to render, so the pager's width stays stable across
 // pages: both boundaries + both sibling groups + the current page + both gap markers.

@@ -9,15 +9,16 @@ const render = (slots: PageSlot[]) => slots.map((s) => (s === PAGE_GAP ? "…" :
 test("short boards show every page, no gaps", () => {
   assert.equal(render(pageWindow(1, 1)), "1");
   assert.equal(render(pageWindow(2, 3)), "1 2 3");
-  assert.equal(render(pageWindow(3, 6)), "1 2 3 4 5 6");
-  assert.equal(render(pageWindow(4, 7)), "1 2 3 4 5 6 7");
+  assert.equal(render(pageWindow(3, 5)), "1 2 3 4 5");
 });
 
 test("long boards keep the first AND last page pinned", () => {
-  assert.equal(render(pageWindow(1, 20)), "1 2 3 4 5 … 20");
-  assert.equal(render(pageWindow(10, 20)), "1 … 9 10 11 … 20");
-  assert.equal(render(pageWindow(20, 20)), "1 … 16 17 18 19 20");
-  assert.equal(render(pageWindow(50, 100)), "1 … 49 50 51 … 100");
+  assert.equal(render(pageWindow(1, 6)), "1 2 3 … 6");
+  assert.equal(render(pageWindow(6, 6)), "1 … 4 5 6");
+  assert.equal(render(pageWindow(1, 20)), "1 2 3 … 20");
+  assert.equal(render(pageWindow(10, 20)), "1 … 10 … 20");
+  assert.equal(render(pageWindow(20, 20)), "1 … 18 19 20");
+  assert.equal(render(pageWindow(50, 100)), "1 … 50 … 100");
 });
 
 // The decisive invariant: whatever the position, both ends are one click away.
@@ -34,7 +35,18 @@ test("page 1 and the last page appear for EVERY current page", () => {
 test("cell count stays constant on long boards (row never reflows while paging)", () => {
   const widths = new Set<number>();
   for (let current = 1; current <= 20; current++) widths.add(pageWindow(current, 20).length);
-  assert.deepEqual([...widths], [7], "every page should render the same number of cells");
+  assert.deepEqual([...widths], [5], "every page should render the same number of cells");
+});
+
+// The compact cap is the whole point of SIBLING_COUNT=0 — a pager that grows with the board would
+// defeat it. 5 = both boundaries + the current page + both gap markers.
+test("never renders more than 5 cells, at any board size", () => {
+  for (const total of [1, 2, 5, 6, 8, 12, 20, 97, 500]) {
+    for (let current = 1; current <= total; current++) {
+      const width = pageWindow(current, total).length;
+      assert.ok(width <= 5, `total=${total} p${current} rendered ${width} cells: ${render(pageWindow(current, total))}`);
+    }
+  }
 });
 
 test("a one-page gap renders the page itself, never a wider ellipsis", () => {
@@ -66,8 +78,8 @@ test("slots are strictly ascending with no duplicates", () => {
 });
 
 test("out-of-range and degenerate inputs stay sane", () => {
-  assert.equal(render(pageWindow(0, 6)), "1 2 3 4 5 6"); // clamped up
-  assert.equal(render(pageWindow(99, 6)), "1 2 3 4 5 6"); // clamped down
+  assert.equal(render(pageWindow(0, 6)), render(pageWindow(1, 6))); // clamped up to page 1
+  assert.equal(render(pageWindow(99, 6)), render(pageWindow(6, 6))); // clamped down to the last page
   assert.equal(render(pageWindow(1, 0)), "1"); // no pages -> still one slot
 });
 
