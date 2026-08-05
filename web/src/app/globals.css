@@ -99,6 +99,15 @@
   /* ── layout ── */
   --maxw: 1120px; /* landing */
   --maxw-board: 1240px; /* board + communities shells */
+
+  /* One board row's total height, DERIVED from the parts that actually determine it in
+     board-row.module.css (.pl): the 32px avatar + 6px block padding each side + the 1px divider.
+     Blank filler rows read this same value so a page with fewer than WEB_PAGE_SIZE entries keeps
+     the card at a constant height. Shared because the two live in different stylesheets and a
+     hardcoded copy silently drifts the moment the row's padding or avatar size changes. */
+  --board-row-avatar: 32px;
+  --board-row-pad-y: 6px;
+  --board-row-height: calc(var(--board-row-avatar) + 2 * var(--board-row-pad-y) + 1px);
 }
 
 * {

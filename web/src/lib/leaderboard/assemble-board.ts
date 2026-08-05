@@ -52,10 +52,18 @@ export async function assembleBoard(params: {
   // only pads the tail; banned rows ABOVE this page already shifted real ranks, but the write-path +
   // nightly rebuild keep the ZSET banned-free, so offset-based ranks are correct in practice (the
   // same straggler caveat as me.rank below). Flat [member, score, ...].
-  const flat = (await redis.zrange(key, query.offset, query.offset + query.limit - 1 + OVERFETCH, {
+  // ZCARD rides along in the SAME pipeline (one round trip) because an empty ZRANGE is ambiguous on
+  // its own: the board key may be missing/empty, OR the key may be fine and `offset` simply past the
+  // end (?page=99 on a real board). Only the FORMER should fall back to the Postgres aggregate —
+  // treating an out-of-range page as a missing board ran the full fallback scan to answer a question
+  // Redis had already answered, and could serve that page from a different source than its siblings.
+  const readPipe = redis.pipeline();
+  readPipe.zrange(key, query.offset, query.offset + query.limit - 1 + OVERFETCH, {
     rev: true,
     withScores: true,
-  })) as Array<string | number>;
+  });
+  readPipe.zcard(key);
+  const [flat, cardAtRead] = (await readPipe.exec()) as [Array<string | number>, number];
 
   let ranked: Array<{ userId: string; score: number }> = [];
   for (let i = 0; i < flat.length; i += 2) {
@@ -63,8 +71,11 @@ export async function assembleBoard(params: {
   }
 
   let usedFallback = false;
-  if (ranked.length === 0) {
-    // Empty/missing board key -> Postgres windowed aggregate (NOT an error). banned-excluded.
+  if (cardAtRead === 0) {
+    // Board key genuinely empty/missing -> Postgres windowed aggregate (NOT an error). banned-excluded.
+    // Note this is keyed on ZCARD, not on `ranked.length`: a populated board asked for an out-of-range
+    // page returns zero rows here and stays on the Redis path, rendering an empty page whose
+    // totalEntries still reflects reality (the page component redirects those back to page 1).
     usedFallback = true;
     ranked = await fallbackBoard({
       scope,
@@ -74,8 +85,9 @@ export async function assembleBoard(params: {
       limit: query.limit,
       offset: query.offset,
     });
-  } else {
-    // banned exclusion (Redis path): ONE query.
+  } else if (ranked.length > 0) {
+    // banned exclusion (Redis path): ONE query. Skipped entirely when the page is out of range —
+    // `inArray(id, [])` would be a pointless round trip (and an empty-IN edge case) for no rows.
     const ids = ranked.map((r) => r.userId);
     const allowed = new Set(
       (
@@ -101,17 +113,15 @@ export async function assembleBoard(params: {
     // in Redis until the nightly rebuild purges them, so me.rank could be off by the (tiny) count of
     // such stragglers. Accepted: the authoritative exclusion is banned_at and rebuild reconciles it;
     // a per-request full-board banned recount would defeat the O(log N) ZSET read.
+    // ZCARD already came back with the page read above, so reuse it rather than asking twice.
+    totalEntries = cardAtRead;
     if (meUserId) {
       const p = redis.pipeline();
       p.zrevrank(key, meUserId);
       p.zscore(key, meUserId);
-      p.zcard(key);
-      const [rk, sc, card] = (await p.exec()) as [number | null, number | null, number];
+      const [rk, sc] = (await p.exec()) as [number | null, number | null];
       meRank = rk === null ? null : rk + 1; // 0-based -> 1-based
       meScore = sc === null ? null : Number(sc);
-      totalEntries = card;
-    } else {
-      totalEntries = await redis.zcard(key);
     }
   } else {
     const f = await fallbackMeRank({ scope, metric: query.metric, windowStart, windowEnd, userId: meUserId });

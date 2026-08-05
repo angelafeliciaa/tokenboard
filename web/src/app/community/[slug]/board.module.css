@@ -98,10 +98,11 @@
 }
 
 /* Empty placeholder row: keeps the card a constant height when a page holds fewer than a full
-   page of entries, so the board never jumps position or resizes. Blank (no divider) — matches a
-   real row's height. */
+   page of entries, so the board never jumps position or resizes. Blank (no divider). Height comes
+   from the shared --board-row-height token that BoardRow's own padding/avatar sizes derive from, so
+   the two can't drift apart if the row is restyled. */
 .fillerRow {
-  height: 45px;
+  height: var(--board-row-height);
 }
 
 .empty {
