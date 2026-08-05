@@ -1,8 +1,8 @@
 // Pagination row (dashboard-pixel .pager-row). Real paging via ?page= (page N => the board reads
-// offset (N-1)*pageSize). Renders the "lo–hi of M" range + first/prev/next/last + a windowed set of
+// offset (N-1)*pageSize). Renders the "lo–hi of M" range + prev/next + a windowed set of
 // numbered page links, each preserving the current window+metric. Server component (no client state —
 // each page is a <Link> that re-renders the server board). Disabled ends are plain <span>s (no dead
-// links). First/last jumps exist so a many-page board doesn't require clicking through the middle.
+// links). Page 1 stays pinned in the numbers (with an "…" gap) so the top is always one click away.
 import Link from "next/link";
 import type { BoardWindow, BoardMetric } from "@tokenboard/contracts";
 import styles from "./pager.module.css";
@@ -47,6 +47,11 @@ export function Pager({
   const pages: number[] = [];
   for (let p = start; p <= end; p++) pages.push(p);
 
+  // Page 1 is ALWAYS reachable: once the window scrolls past it (page 5+ on a long board) the "1"
+  // would disappear and getting back to the top would mean stepping through the middle. So pin it,
+  // with an ellipsis when there's a gap. `null` marks the gap — rendered as a non-interactive "…".
+  const numbered: Array<number | null> = pages[0] === 1 ? pages : [1, ...(pages[0]! > 2 ? [null] : []), ...pages];
+
   const atFirst = current <= 1;
   const atLast = current >= totalPages;
 
@@ -70,11 +75,14 @@ export function Pager({
         {lo}&ndash;{hi} of {totalEntries}
       </span>
       <div className={styles.pager}>
-        {navButton(1, "First page", "⏮", atFirst)}
         {navButton(current - 1, "Previous page", "◀", atFirst, "prev")}
 
-        {pages.map((p) =>
-          p === current ? (
+        {numbered.map((p, i) =>
+          p === null ? (
+            <span key={`gap-${i}`} className={styles.gap} aria-hidden="true">
+              &hellip;
+            </span>
+          ) : p === current ? (
             <span key={p} className={`${styles.pg} ${styles.active}`} aria-current="page">
               {p}
             </span>
@@ -86,7 +94,6 @@ export function Pager({
         )}
 
         {navButton(current + 1, "Next page", "▶", atLast, "next")}
-        {navButton(totalPages, "Last page", "⏭", atLast)}
       </div>
     </div>
   );
