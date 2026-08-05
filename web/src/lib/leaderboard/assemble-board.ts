@@ -24,6 +24,7 @@ import {
 import { windowTotalsForUsers } from "./window-sums-batch";
 
 const OVERFETCH = 32; // buffer so banned drops don't shrink the page below limit.
+const MAX_BACKFILL_CHUNKS = 8;
 
 function toDisplayUnit(metric: BoardQuery["metric"], score: number): number {
   return metric === "cost" ? microsToUsd2dp(score) : score;
@@ -51,7 +52,7 @@ export async function assembleBoard(params: {
   const CHUNK = query.limit + OVERFETCH;
   let ranked: Array<{ userId: string; score: number }> = [];
   let cursor = query.offset;
-  while (ranked.length < query.limit) {
+  for (let chunks = 0; ranked.length < query.limit && chunks < MAX_BACKFILL_CHUNKS; chunks++) {
     const flat = (await redis.zrange(key, cursor, cursor + CHUNK - 1, {
       rev: true,
       withScores: true,
@@ -74,7 +75,7 @@ export async function assembleBoard(params: {
   }
 
   let usedFallback = false;
-  if (ranked.length === 0 && query.offset === 0) {
+  if (ranked.length === 0) {
     usedFallback = true;
     ranked = await fallbackBoard({
       scope,
