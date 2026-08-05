@@ -14,13 +14,19 @@
   max-width: var(--maxw-board);
   margin: 0 auto;
   flex: 1 1 auto;
-  padding: 26px 28px 8px;
+  padding: 12px 28px 4px;
 }
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: 22px;
   align-items: start;
+}
+/* No right rail (e.g. the signed-out global board) — one centered column instead of a dead 360px
+   gap. Capped width so the board doesn't stretch uncomfortably wide on a big screen. */
+.layoutSolo {
+  grid-template-columns: minmax(0, 720px);
+  justify-content: center;
 }
 
 .card {
@@ -30,13 +36,13 @@
   background: var(--bg-2);
   border: 1px solid var(--frame);
   border-radius: 14px;
-  padding: 24px 30px 20px;
+  padding: 18px 30px 16px;
   position: relative;
 }
 
 .head {
   text-align: left;
-  padding: 0 0 12px;
+  padding: 0 0 4px;
 }
 .title {
   font-family: var(--money);
@@ -55,7 +61,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 2px 0 14px;
+  margin: 0 0 8px;
   flex-wrap: wrap;
 }
 
@@ -68,7 +74,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .rule {
   flex: 1;
@@ -89,6 +95,22 @@
   list-style: none;
   display: flex;
   flex-direction: column;
+}
+
+/* Empty placeholder row: keeps the card a constant height when a page holds fewer than a full
+   page of entries, so the board never jumps position or resizes. Blank (no divider). Height comes
+   from the shared --board-row-height token that BoardRow's own padding/avatar sizes derive from, so
+   the two can't drift apart if the row is restyled. */
+.fillerRow {
+  height: var(--board-row-height);
+}
+
+/* A real last row sheds its divider (.pl:last-child), so the LAST SLOT of any page is one divider
+   shorter than the rest. A trailing filler has no divider to shed, which made a padded page exactly
+   1px taller than a full one — the constant-height promise broken by the smallest possible amount.
+   Shrink the final filler by the same divider width so every page totals the same height. */
+.fillerRow:last-child {
+  height: calc(var(--board-row-height) - var(--board-row-divider));
 }
 
 .empty {
