@@ -128,6 +128,17 @@
   color: var(--coral);
   border-color: var(--coral-hi);
 }
+.inviteFallback {
+  font-family: var(--term);
+  font-size: var(--fs-13);
+  line-height: 1.4;
+  color: var(--coral);
+}
+.inviteFallbackText {
+  color: var(--ink);
+  user-select: all;
+  word-break: break-all;
+}
 
 .leaveWrap {
   margin-top: 12px;
