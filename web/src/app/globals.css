@@ -107,7 +107,8 @@
      hardcoded copy silently drifts the moment the row's padding or avatar size changes. */
   --board-row-avatar: 32px;
   --board-row-pad-y: 6px;
-  --board-row-height: calc(var(--board-row-avatar) + 2 * var(--board-row-pad-y) + 1px);
+  --board-row-divider: 1px;
+  --board-row-height: calc(var(--board-row-avatar) + 2 * var(--board-row-pad-y) + var(--board-row-divider));
 }
 
 * {

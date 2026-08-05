@@ -105,6 +105,14 @@
   height: var(--board-row-height);
 }
 
+/* A real last row sheds its divider (.pl:last-child), so the LAST SLOT of any page is one divider
+   shorter than the rest. A trailing filler has no divider to shed, which made a padded page exactly
+   1px taller than a full one — the constant-height promise broken by the smallest possible amount.
+   Shrink the final filler by the same divider width so every page totals the same height. */
+.fillerRow:last-child {
+  height: calc(var(--board-row-height) - var(--board-row-divider));
+}
+
 .empty {
   font-family: var(--term);
   font-size: var(--fs-18);

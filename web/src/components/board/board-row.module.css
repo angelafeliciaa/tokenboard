@@ -7,7 +7,7 @@
   align-items: center;
   padding: var(--board-row-pad-y) 8px;
   position: relative;
-  border-bottom: 1px solid var(--frame);
+  border-bottom: var(--board-row-divider) solid var(--frame);
   transition: background 0.12s;
 }
 .pl:last-child {
