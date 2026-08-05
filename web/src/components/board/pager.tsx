@@ -2,13 +2,12 @@
 // offset (N-1)*pageSize). Renders the "lo–hi of M" range + prev/next + a windowed set of
 // numbered page links, each preserving the current window+metric. Server component (no client state —
 // each page is a <Link> that re-renders the server board). Disabled ends are plain <span>s (no dead
-// links). Page 1 stays pinned in the numbers (with an "…" gap) so the top is always one click away.
+// links). The FIRST and LAST pages stay pinned in the numbers (with "…" gaps) so either end is
+// always one click away — see lib/board/page-window.ts for the slot algorithm.
 import Link from "next/link";
 import type { BoardWindow, BoardMetric } from "@tokenboard/contracts";
+import { pageWindow, totalPages as pageCount, PAGE_GAP } from "@/lib/board/page-window";
 import styles from "./pager.module.css";
-
-// How many numbered links to show around the current page.
-const WINDOW = 5;
 
 export function Pager({
   totalEntries,
@@ -29,7 +28,7 @@ export function Pager({
 }) {
   if (shown === 0) return null;
 
-  const totalPages = Math.max(1, Math.ceil(totalEntries / pageSize));
+  const totalPages = pageCount(totalEntries, pageSize);
   const current = Math.min(Math.max(page, 1), totalPages);
   const lo = (current - 1) * pageSize + 1;
   const hi = lo + shown - 1;
@@ -40,17 +39,7 @@ export function Pager({
     return `${basePath}?${params.toString()}`;
   };
 
-  // A centered window of page numbers, clamped to [1, totalPages].
-  const half = Math.floor(WINDOW / 2);
-  const end = Math.min(totalPages, Math.max(current + half, WINDOW));
-  const start = Math.max(1, end - WINDOW + 1);
-  const pages: number[] = [];
-  for (let p = start; p <= end; p++) pages.push(p);
-
-  // Page 1 is ALWAYS reachable: once the window scrolls past it (page 5+ on a long board) the "1"
-  // would disappear and getting back to the top would mean stepping through the middle. So pin it,
-  // with an ellipsis when there's a gap. `null` marks the gap — rendered as a non-interactive "…".
-  const numbered: Array<number | null> = pages[0] === 1 ? pages : [1, ...(pages[0]! > 2 ? [null] : []), ...pages];
+  const slots = pageWindow(current, totalPages);
 
   const atFirst = current <= 1;
   const atLast = current >= totalPages;
@@ -77,8 +66,8 @@ export function Pager({
       <div className={styles.pager}>
         {navButton(current - 1, "Previous page", "◀", atFirst, "prev")}
 
-        {numbered.map((p, i) =>
-          p === null ? (
+        {slots.map((p, i) =>
+          p === PAGE_GAP ? (
             <span key={`gap-${i}`} className={styles.gap} aria-hidden="true">
               &hellip;
             </span>
