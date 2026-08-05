@@ -13,6 +13,7 @@ import { mintJoinCode } from "@/lib/communities/join-code";
 import { profKey } from "@/lib/leaderboard/keys";
 import { redis } from "@/lib/redis/client";
 import { enforce } from "@/lib/ratelimit/enforce";
+import { requireJsonContentType } from "@/lib/http/require-json";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,9 @@ const SLUG_RETRIES = 6;
 const UNIQUE_VIOLATION = "23505";
 
 export async function POST(request: NextRequest) {
+  const badContentType = requireJsonContentType(request); // CSRF guard
+  if (badContentType) return badContentType;
+
   let body: unknown;
   try {
     body = await request.json();

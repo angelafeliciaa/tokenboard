@@ -6,6 +6,7 @@ import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { boardQuerySchema } from "@tokenboard/contracts";
 import { getViewer } from "@/lib/auth/get-viewer";
+import { getViewerMembership } from "@/lib/communities/get-membership";
 import { resolveBoardScope } from "@/lib/leaderboard/resolve-scope";
 import { assembleBoard } from "@/lib/leaderboard/assemble-board";
 import { WEB_DEFAULT_METRIC, WEB_DEFAULT_WINDOW, WEB_PAGE_SIZE } from "@/lib/board/web-defaults";
@@ -124,6 +125,10 @@ export default async function BoardPage({
   // "here's where you stand" cue; repeating it on every page would be noise).
   const pinnedMe = page === 1 && board.me && board.me.inTopN === false ? board.me.entry : null;
 
+  // Membership drives the community panel's join/leave control (from main).
+  const membership =
+    viewer && board.community ? await getViewerMembership(viewer.userId, board.community.slug) : null;
+
   // The right rail only has content when the viewer has a ranked standing OR the board is a community
   // (which shows the CommunityPanel). On the signed-out global board it's empty — so drop the rail and
   // let the board use the full width instead of leaving a dead 360px column.
@@ -208,7 +213,9 @@ export default async function BoardPage({
                 viewer={viewer}
                 aliasCompany={aliasCompany}
               />
-              {board.community && <CommunityPanel community={board.community} />}
+              {board.community && (
+                <CommunityPanel community={board.community} membership={membership} />
+              )}
             </aside>
           )}
         </div>
