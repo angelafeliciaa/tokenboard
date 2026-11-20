@@ -25,10 +25,29 @@ export function Pager({
   totalEntries: number;
   shown: number;
 }) {
-  if (shown === 0) return null;
-
   const maxReachablePage = Math.floor(MAX_BOARD_OFFSET / pageSize) + 1;
   const pages = Math.min(totalPages(totalEntries, pageSize), maxReachablePage);
+
+  if (shown === 0) {
+    if (page <= 1) return null;
+    // totalEntries can over-count (members the board holds that no longer rank), so a page past 1 can
+    // come back empty. Without a link back the pager vanishes and the user is stranded.
+    const back = Math.min(page - 1, pages);
+    return (
+      <nav className={styles.emptyPage} aria-label="Pagination">
+        <p className={styles.range}>No entries on page {page}.</p>
+        <Link className={`${styles.pg} ${styles.back}`} href={hrefFor(basePath, window, metric, back)}>
+          Back to page {back}
+        </Link>
+        {back > 1 && (
+          <Link className={`${styles.pg} ${styles.back}`} href={hrefFor(basePath, window, metric, 1)}>
+            First page
+          </Link>
+        )}
+      </nav>
+    );
+  }
+
   const current = Math.min(Math.max(1, page), pages);
   const offset = (current - 1) * pageSize;
   const from = offset + 1;

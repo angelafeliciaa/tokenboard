@@ -154,7 +154,7 @@ export default async function BoardPage({
               </span>
             </div>
 
-            {board.entries.length === 0 ? (
+            {board.entries.length === 0 && page <= 1 ? (
               <p className={styles.empty}>No synced usage in this window yet. Be the first on the board.</p>
             ) : (
               <ul className={styles.board}>
