@@ -69,6 +69,12 @@ function dateLower(windowStart: string | null): ReturnType<typeof sql> {
   return windowStart === null ? sql`` : sql`and udt.date >= ${windowStart}`;
 }
 
+// Equal scores must rank in the SAME order Redis uses, or a board flips between paths. Redis
+// (ZREVRANGE) breaks ties by member BYTE-wise descending. user_id is a lowercase-hex uuid, so compare
+// its text under the "C" collation (plain memcmp), never a locale one (en_US would ignore case and
+// punctuation and disagree with Redis) and never `asc`.
+const TIE_BREAK = sql`udt.user_id::text collate "C" desc`;
+
 // Top-N for the Postgres fallback when the Redis board key is empty/missing. banned-excluded; ranked
 // by the requested metric desc. Returns [{userId, score}] where score is tokens | micro-dollars.
 export async function fallbackBoard(p: {
@@ -91,7 +97,7 @@ export async function fallbackBoard(p: {
     where udt.date <= ${p.windowEnd} ${dateLower(p.windowStart)}
     group by udt.user_id
     having ${orderCol} > 0
-    order by ${orderCol} desc, udt.user_id asc
+    order by ${orderCol} desc, ${TIE_BREAK}
     limit ${p.limit} offset ${p.offset ?? 0}
   `)) as unknown as Array<{ user_id: string; tokens: string; cost_usd: string }>;
   return rows.map((r) => ({
@@ -116,7 +122,7 @@ export async function fallbackMeRank(p: {
       select udt.user_id::text as user_id,
              coalesce(sum(udt.tokens),0)::text as tokens,
              coalesce(sum(udt.cost_usd),0)::text as cost_usd,
-             row_number() over (order by ${orderCol} desc, udt.user_id asc) as rk
+             row_number() over (order by ${orderCol} desc, ${TIE_BREAK}) as rk
       from usage_day_total udt
       join users u on u.id = udt.user_id and u.banned_at is null
       ${join}
