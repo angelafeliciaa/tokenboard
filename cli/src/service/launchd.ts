@@ -3,7 +3,7 @@ import { join, dirname } from "node:path";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import type { ServiceSpec } from "./spec.js";
 import type { SchedulerBackend } from "./backend.js";
-import { runCommand } from "./exec.js";
+import type { CommandRunner } from "./exec.js";
 
 const NOT_LOADED = /no such process|could not find|not find/i;
 
@@ -50,43 +50,45 @@ ${programArgs}
 `;
 }
 
-export const launchdBackend: SchedulerBackend = {
-  name: "launchd",
+export function createLaunchdBackend(run: CommandRunner): SchedulerBackend {
+  return {
+    name: "launchd",
 
-  async install(spec) {
-    const path = launchdPlistPath(spec.label);
-    await mkdir(launchAgentsDir(), { recursive: true });
-    await mkdir(dirname(spec.logPath), { recursive: true });
-    await writeFile(path, buildLaunchdPlist(spec), "utf8");
+    async install(spec) {
+      const path = launchdPlistPath(spec.label);
+      await mkdir(launchAgentsDir(), { recursive: true });
+      await mkdir(dirname(spec.logPath), { recursive: true });
+      await writeFile(path, buildLaunchdPlist(spec), "utf8");
 
-    await runCommand("launchctl", ["bootout", guiDomain(), path]);
-    const boot = await runCommand("launchctl", ["bootstrap", guiDomain(), path]);
-    if (boot.code !== 0) {
-      throw new Error(`launchctl bootstrap failed: ${boot.stderr.trim() || boot.stdout.trim() || `exit ${boot.code}`}`);
-    }
-    const kick = await runCommand("launchctl", ["kickstart", `${guiDomain()}/${spec.label}`]);
-    return kick.code === 0
-      ? { firstRunStarted: true }
-      : { firstRunStarted: false, firstRunDetail: kick.stderr.trim() || kick.stdout.trim() || `exit ${kick.code}` };
-  },
+      await run("launchctl", ["bootout", guiDomain(), path]);
+      const boot = await run("launchctl", ["bootstrap", guiDomain(), path]);
+      if (boot.code !== 0) {
+        throw new Error(`launchctl bootstrap failed: ${boot.stderr.trim() || boot.stdout.trim() || `exit ${boot.code}`}`);
+      }
+      const kick = await run("launchctl", ["kickstart", `${guiDomain()}/${spec.label}`]);
+      return kick.code === 0
+        ? { firstRunStarted: true }
+        : { firstRunStarted: false, firstRunDetail: kick.stderr.trim() || kick.stdout.trim() || `exit ${kick.code}` };
+    },
 
-  async uninstall(spec) {
-    const path = launchdPlistPath(spec.label);
-    const boot = await runCommand("launchctl", ["bootout", guiDomain(), path]);
-    if (boot.code !== 0 && !NOT_LOADED.test(`${boot.stderr}${boot.stdout}`)) {
-      throw new Error(`launchctl bootout failed (job may still be running): ${boot.stderr.trim() || boot.stdout.trim() || `exit ${boot.code}`}`);
-    }
-    await rm(path, { force: true });
-  },
+    async uninstall(spec) {
+      const path = launchdPlistPath(spec.label);
+      const boot = await run("launchctl", ["bootout", guiDomain(), path]);
+      if (boot.code !== 0 && !NOT_LOADED.test(`${boot.stderr}${boot.stdout}`)) {
+        throw new Error(`launchctl bootout failed (job may still be running): ${boot.stderr.trim() || boot.stdout.trim() || `exit ${boot.code}`}`);
+      }
+      await rm(path, { force: true });
+    },
 
-  async status(spec) {
-    const print = await runCommand("launchctl", ["print", `${guiDomain()}/${spec.label}`]);
-    const loaded = print.code === 0;
-    const stateLine = print.stdout.split("\n").map((l) => l.trim()).find((l) => l.startsWith("state = "));
-    return {
-      installed: loaded,
-      loaded,
-      detail: loaded ? stateLine ?? "registered with launchd" : "not registered with launchd",
-    };
-  },
-};
+    async status(spec) {
+      const print = await run("launchctl", ["print", `${guiDomain()}/${spec.label}`]);
+      const loaded = print.code === 0;
+      const stateLine = print.stdout.split("\n").map((l) => l.trim()).find((l) => l.startsWith("state = "));
+      return {
+        installed: loaded,
+        loaded,
+        detail: loaded ? stateLine ?? "registered with launchd" : "not registered with launchd",
+      };
+    },
+  };
+}

@@ -1,8 +1,9 @@
 import { platform } from "node:os";
 import type { ServiceSpec } from "./spec.js";
-import { launchdBackend } from "./launchd.js";
-import { systemdBackend } from "./systemd.js";
-import { schtasksBackend } from "./schtasks.js";
+import { runCommand, type CommandRunner } from "./exec.js";
+import { createLaunchdBackend } from "./launchd.js";
+import { createSystemdBackend } from "./systemd.js";
+import { createSchtasksBackend } from "./schtasks.js";
 
 export interface ServiceStatus {
   installed: boolean;
@@ -22,14 +23,14 @@ export interface SchedulerBackend {
   status(spec: ServiceSpec): Promise<ServiceStatus>;
 }
 
-export function selectBackend(os: NodeJS.Platform = platform()): SchedulerBackend {
+export function selectBackend(os: NodeJS.Platform = platform(), run: CommandRunner = runCommand): SchedulerBackend {
   switch (os) {
     case "darwin":
-      return launchdBackend;
+      return createLaunchdBackend(run);
     case "linux":
-      return systemdBackend;
+      return createSystemdBackend(run);
     case "win32":
-      return schtasksBackend;
+      return createSchtasksBackend(run);
     default:
       throw new Error(`background sync is not supported on this platform (${os}). Run \`tokenboard sync\` manually or from your own scheduler.`);
   }

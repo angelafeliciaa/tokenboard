@@ -6,11 +6,12 @@ export interface CommandResult {
   stderr: string;
 }
 
-export function runCommand(file: string, args: string[]): Promise<CommandResult> {
-  return new Promise((resolve) => {
+export type CommandRunner = (file: string, args: string[]) => Promise<CommandResult>;
+
+export const runCommand: CommandRunner = (file, args) =>
+  new Promise((resolve) => {
     execFile(file, args, { encoding: "utf8" }, (err, stdout, stderr) => {
       const code = err && typeof (err as { code?: unknown }).code === "number" ? (err as { code: number }).code : err ? 1 : 0;
       resolve({ code, stdout: stdout ?? "", stderr: stderr ?? "" });
     });
   });
-}

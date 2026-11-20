@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import type { ServiceSpec } from "./spec.js";
 import type { SchedulerBackend } from "./backend.js";
-import { runCommand } from "./exec.js";
+import type { CommandRunner } from "./exec.js";
 
 export function hasSystemd(): boolean {
   return existsSync("/run/systemd/system");
@@ -49,52 +49,54 @@ WantedBy=timers.target
 `;
 }
 
-export const systemdBackend: SchedulerBackend = {
-  name: "systemd",
+export function createSystemdBackend(run: CommandRunner): SchedulerBackend {
+  return {
+    name: "systemd",
 
-  async install(spec) {
-    if (!hasSystemd()) throw new Error(NO_SYSTEMD_MESSAGE);
-    const dir = userUnitDir();
-    await mkdir(dir, { recursive: true });
-    await mkdir(dirname(spec.logPath), { recursive: true });
-    await writeFile(join(dir, serviceUnitName(spec.label)), buildServiceUnit(spec), "utf8");
-    await writeFile(join(dir, timerUnitName(spec.label)), buildTimerUnit(spec), "utf8");
+    async install(spec) {
+      if (!hasSystemd()) throw new Error(NO_SYSTEMD_MESSAGE);
+      const dir = userUnitDir();
+      await mkdir(dir, { recursive: true });
+      await mkdir(dirname(spec.logPath), { recursive: true });
+      await writeFile(join(dir, serviceUnitName(spec.label)), buildServiceUnit(spec), "utf8");
+      await writeFile(join(dir, timerUnitName(spec.label)), buildTimerUnit(spec), "utf8");
 
-    await runCommand("systemctl", ["--user", "daemon-reload"]);
-    const enable = await runCommand("systemctl", ["--user", "enable", "--now", timerUnitName(spec.label)]);
-    if (enable.code !== 0) {
-      throw new Error(`systemctl enable failed: ${enable.stderr.trim() || enable.stdout.trim() || `exit ${enable.code}`}`);
-    }
-    const start = await runCommand("systemctl", ["--user", "start", serviceUnitName(spec.label)]);
-    return start.code === 0
-      ? { firstRunStarted: true }
-      : { firstRunStarted: false, firstRunDetail: start.stderr.trim() || start.stdout.trim() || `exit ${start.code}` };
-  },
-
-  async uninstall(spec) {
-    if (hasSystemd()) {
-      const disable = await runCommand("systemctl", ["--user", "disable", "--now", timerUnitName(spec.label)]);
-      if (disable.code !== 0 && !/not loaded|no such file|does not exist/i.test(`${disable.stderr}${disable.stdout}`)) {
-        throw new Error(`systemctl disable failed (timer may still be active): ${disable.stderr.trim() || disable.stdout.trim() || `exit ${disable.code}`}`);
+      await run("systemctl", ["--user", "daemon-reload"]);
+      const enable = await run("systemctl", ["--user", "enable", "--now", timerUnitName(spec.label)]);
+      if (enable.code !== 0) {
+        throw new Error(`systemctl enable failed: ${enable.stderr.trim() || enable.stdout.trim() || `exit ${enable.code}`}`);
       }
-    }
-    await rm(join(userUnitDir(), serviceUnitName(spec.label)), { force: true });
-    await rm(join(userUnitDir(), timerUnitName(spec.label)), { force: true });
-    if (hasSystemd()) {
-      await runCommand("systemctl", ["--user", "daemon-reload"]);
-    }
-  },
+      const start = await run("systemctl", ["--user", "start", serviceUnitName(spec.label)]);
+      return start.code === 0
+        ? { firstRunStarted: true }
+        : { firstRunStarted: false, firstRunDetail: start.stderr.trim() || start.stdout.trim() || `exit ${start.code}` };
+    },
 
-  async status(spec) {
-    if (!hasSystemd()) return { installed: false, loaded: false, detail: "systemd not available on this system" };
-    const active = await runCommand("systemctl", ["--user", "is-active", timerUnitName(spec.label)]);
-    const loaded = active.stdout.trim() === "active";
-    const enabled = await runCommand("systemctl", ["--user", "is-enabled", timerUnitName(spec.label)]);
-    const installed = enabled.code === 0 || loaded;
-    return {
-      installed,
-      loaded,
-      detail: loaded ? `timer active (${enabled.stdout.trim() || "enabled"})` : installed ? "timer installed but inactive" : "timer not installed",
-    };
-  },
-};
+    async uninstall(spec) {
+      if (hasSystemd()) {
+        const disable = await run("systemctl", ["--user", "disable", "--now", timerUnitName(spec.label)]);
+        if (disable.code !== 0 && !/not loaded|no such file|does not exist/i.test(`${disable.stderr}${disable.stdout}`)) {
+          throw new Error(`systemctl disable failed (timer may still be active): ${disable.stderr.trim() || disable.stdout.trim() || `exit ${disable.code}`}`);
+        }
+      }
+      await rm(join(userUnitDir(), serviceUnitName(spec.label)), { force: true });
+      await rm(join(userUnitDir(), timerUnitName(spec.label)), { force: true });
+      if (hasSystemd()) {
+        await run("systemctl", ["--user", "daemon-reload"]);
+      }
+    },
+
+    async status(spec) {
+      if (!hasSystemd()) return { installed: false, loaded: false, detail: "systemd not available on this system" };
+      const active = await run("systemctl", ["--user", "is-active", timerUnitName(spec.label)]);
+      const loaded = active.stdout.trim() === "active";
+      const enabled = await run("systemctl", ["--user", "is-enabled", timerUnitName(spec.label)]);
+      const installed = enabled.code === 0 || loaded;
+      return {
+        installed,
+        loaded,
+        detail: loaded ? `timer active (${enabled.stdout.trim() || "enabled"})` : installed ? "timer installed but inactive" : "timer not installed",
+      };
+    },
+  };
+}

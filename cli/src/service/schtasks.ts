@@ -2,7 +2,7 @@ import { dirname } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { ServiceSpec } from "./spec.js";
 import type { SchedulerBackend } from "./backend.js";
-import { runCommand } from "./exec.js";
+import type { CommandRunner } from "./exec.js";
 
 const TASK_NOT_FOUND = /cannot find|does not exist|no such/i;
 
@@ -28,40 +28,42 @@ export function parseSchtasksState(stdout: string): { loaded: boolean; detail: s
   return { loaded: !/disabled/i.test(state), detail: `Task Scheduler: ${state}` };
 }
 
-export const schtasksBackend: SchedulerBackend = {
-  name: "Task Scheduler",
+export function createSchtasksBackend(run: CommandRunner): SchedulerBackend {
+  return {
+    name: "Task Scheduler",
 
-  async install(spec) {
-    await mkdir(dirname(spec.logPath), { recursive: true });
-    const create = await runCommand("schtasks", [
-      "/Create",
-      "/TN", taskName(spec.label),
-      "/TR", buildSchtasksRunCommand(spec),
-      ...scheduleArgs(spec),
-      "/F",
-    ]);
-    if (create.code !== 0) {
-      throw new Error(`schtasks /Create failed: ${create.stderr.trim() || create.stdout.trim() || `exit ${create.code}`}`);
-    }
-    const run = await runCommand("schtasks", ["/Run", "/TN", taskName(spec.label)]);
-    return run.code === 0
-      ? { firstRunStarted: true }
-      : { firstRunStarted: false, firstRunDetail: run.stderr.trim() || run.stdout.trim() || `exit ${run.code}` };
-  },
+    async install(spec) {
+      await mkdir(dirname(spec.logPath), { recursive: true });
+      const create = await run("schtasks", [
+        "/Create",
+        "/TN", taskName(spec.label),
+        "/TR", buildSchtasksRunCommand(spec),
+        ...scheduleArgs(spec),
+        "/F",
+      ]);
+      if (create.code !== 0) {
+        throw new Error(`schtasks /Create failed: ${create.stderr.trim() || create.stdout.trim() || `exit ${create.code}`}`);
+      }
+      const start = await run("schtasks", ["/Run", "/TN", taskName(spec.label)]);
+      return start.code === 0
+        ? { firstRunStarted: true }
+        : { firstRunStarted: false, firstRunDetail: start.stderr.trim() || start.stdout.trim() || `exit ${start.code}` };
+    },
 
-  async uninstall(spec) {
-    const del = await runCommand("schtasks", ["/Delete", "/TN", taskName(spec.label), "/F"]);
-    if (del.code !== 0 && !TASK_NOT_FOUND.test(`${del.stderr}${del.stdout}`)) {
-      throw new Error(`schtasks /Delete failed (task may still be registered): ${del.stderr.trim() || del.stdout.trim() || `exit ${del.code}`}`);
-    }
-  },
+    async uninstall(spec) {
+      const del = await run("schtasks", ["/Delete", "/TN", taskName(spec.label), "/F"]);
+      if (del.code !== 0 && !TASK_NOT_FOUND.test(`${del.stderr}${del.stdout}`)) {
+        throw new Error(`schtasks /Delete failed (task may still be registered): ${del.stderr.trim() || del.stdout.trim() || `exit ${del.code}`}`);
+      }
+    },
 
-  async status(spec) {
-    const query = await runCommand("schtasks", ["/Query", "/TN", taskName(spec.label), "/V", "/FO", "LIST"]);
-    if (query.code !== 0) {
-      return { installed: false, loaded: false, detail: "not registered with Task Scheduler" };
-    }
-    const { loaded, detail } = parseSchtasksState(query.stdout);
-    return { installed: true, loaded, detail };
-  },
-};
+    async status(spec) {
+      const query = await run("schtasks", ["/Query", "/TN", taskName(spec.label), "/V", "/FO", "LIST"]);
+      if (query.code !== 0) {
+        return { installed: false, loaded: false, detail: "not registered with Task Scheduler" };
+      }
+      const { loaded, detail } = parseSchtasksState(query.stdout);
+      return { installed: true, loaded, detail };
+    },
+  };
+}
