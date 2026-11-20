@@ -52,12 +52,16 @@ export async function assembleBoard(params: {
   const CHUNK = query.limit + OVERFETCH;
   let ranked: Array<{ userId: string; score: number }> = [];
   let cursor = query.offset;
+  let reachedEnd = false; // the ZSET ran out (vs. the backfill cap stopping us early)
   for (let chunks = 0; ranked.length < query.limit && chunks < MAX_BACKFILL_CHUNKS; chunks++) {
     const flat = (await redis.zrange(key, cursor, cursor + CHUNK - 1, {
       rev: true,
       withScores: true,
     })) as Array<string | number>;
-    if (flat.length === 0) break;
+    if (flat.length === 0) {
+      reachedEnd = true;
+      break;
+    }
     const chunk: Array<{ userId: string; score: number }> = [];
     for (let i = 0; i < flat.length; i += 2) {
       chunk.push({ userId: String(flat[i]), score: Number(flat[i + 1]) });
@@ -71,11 +75,19 @@ export async function assembleBoard(params: {
       ).map((r) => r.id),
     );
     for (const c of chunk) if (allowed.has(c.userId)) ranked.push(c);
+    if (chunk.length < CHUNK) {
+      reachedEnd = true;
+      break;
+    }
     cursor += CHUNK;
   }
 
   let usedFallback = false;
-  if (ranked.length === 0) {
+  // Fall back to Postgres when Redis has nothing, or when the backfill cap stopped us short of a full
+  // page while more members remain: a short page would silently hide eligible users, whereas Postgres
+  // ranks with banned already excluded so the page offset is exact.
+  const cappedShort = !reachedEnd && ranked.length < query.limit;
+  if (ranked.length === 0 || cappedShort) {
     usedFallback = true;
     ranked = await fallbackBoard({
       scope,
