@@ -27,7 +27,27 @@ test("fallback ties break like Redis: user_id text, C collation, descending", as
   const ordered = queries.filter((q) => /order by/.test(q));
   assert.ok(ordered.length >= 2, "expected both fallback queries to be captured");
   for (const q of ordered) {
-    assert.match(q, /user_id"?::text collate "C" desc/);
-    assert.doesNotMatch(q, /user_id"? asc/);
+    assert.match(q, /u\.id::text collate "C" desc/);
+    assert.doesNotMatch(q, /u\.id asc|user_id asc/);
+  }
+});
+
+test("fallback ranks the seeded population: every non-banned user, $0 included", async () => {
+  const scopes = ["g", "c:11111111-1111-4111-8111-111111111111"] as const;
+  for (const scope of scopes) {
+    queries.length = 0;
+    await fallbackBoard({ ...base, scope, limit: 50 });
+    await fallbackMeRank({ ...base, scope, userId: "u" });
+
+    assert.equal(queries.length, 3, "board query, ranked query, and the no-row total count");
+    for (const q of queries) {
+      assert.match(q, /from users u/, "population must start from users, not usage rows");
+      assert.match(q, /u\.banned_at is null/);
+      assert.doesNotMatch(q, /\bhaving\b/, "a usage > 0 filter would drop the $0-seeded users");
+      if (scope !== "g") assert.match(q, /join memberships mm on mm\.user_id = u\.id and mm\.community_id = \$/);
+    }
+    for (const q of queries.slice(0, 2)) {
+      assert.match(q, /left join usage_day_total udt\s+on udt\.user_id = u\.id and udt\.date <= /);
+    }
   }
 });
