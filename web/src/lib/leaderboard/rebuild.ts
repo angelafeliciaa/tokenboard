@@ -21,6 +21,8 @@ import {
 import { todayUtcYmd } from "./windows";
 import { runLeaderboardSweep } from "./sweep";
 
+// Bound as an untyped parameter, so Postgres reads `current_date - $1` as date - date (an
+// integer) and `date >= integer` fails. The ::int cast picks date - integer.
 const REBUILD_DAYS = 40;
 
 // rows of (scope, date, user_id, tokens, micros) for the last 40 days. Global = all non-banned;
@@ -42,7 +44,7 @@ async function seedRows(): Promise<DayRow[]> {
            udt.tokens::text as tokens, udt.cost_usd::text as cost_usd
     from usage_day_total udt
     join users u on u.id = udt.user_id and u.banned_at is null
-    where udt.date >= current_date - ${REBUILD_DAYS}
+    where udt.date >= current_date - ${REBUILD_DAYS}::int
   `)) as unknown as Array<{ date: string; user_id: string; tokens: string; cost_usd: string }>;
   for (const r of g) {
     out.push({ scope: "g", date: r.date, userId: r.user_id, tokens: Number(r.tokens), micros: costUsdStringToMicros(r.cost_usd) });
@@ -55,7 +57,7 @@ async function seedRows(): Promise<DayRow[]> {
     from usage_day_total udt
     join users u on u.id = udt.user_id and u.banned_at is null
     join memberships m on m.user_id = udt.user_id
-    where udt.date >= current_date - ${REBUILD_DAYS}
+    where udt.date >= current_date - ${REBUILD_DAYS}::int
   `)) as unknown as Array<{ community_id: string; date: string; user_id: string; tokens: string; cost_usd: string }>;
   for (const r of c) {
     out.push({

@@ -32,7 +32,10 @@ export function estimateCost(
   counts: CostCounts,
   prices: PriceTable,
 ): { costUsd: number; priced: boolean } {
-  const p = prices[counts.model];
+  // Why the gemini/ fallback: LiteLLM lists some Gemini models (gemini-4-*) ONLY under a provider
+  // prefix, never bare, while clients report the bare name. Deliberately just this one prefix, not
+  // a general fuzzy matcher: a wrong match would silently misprice, a miss surfaces as unpriced.
+  const p = prices[counts.model] ?? prices[`gemini/${counts.model}`];
   if (!p || p.input_cost_per_token == null) return { costUsd: 0, priced: false };
 
   const costUsd =
