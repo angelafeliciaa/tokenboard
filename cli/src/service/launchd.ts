@@ -60,10 +60,12 @@ export function parseLaunchdState(stdout: string): StepOutcome {
 }
 
 export function createLaunchdBackend(run: CommandRunner): SchedulerBackend {
+  // Bootout by service target, not plist path: for a job that isn't loaded the target form exits
+  // "3: No such process" (matched by NOT_LOADED), while the path form exits a generic "5: Input/output error".
   const target = (spec: ServiceSpec) => `${guiDomain()}/${spec.label}`;
 
   const unload = async (spec: ServiceSpec): Promise<StepOutcome> => {
-    const boot = await run("launchctl", ["bootout", guiDomain(), launchdPlistPath(spec.label)]);
+    const boot = await run("launchctl", ["bootout", target(spec)]);
     if (boot.code === 0) return { status: "done", detail: "unloaded" };
     if (NOT_LOADED.test(`${boot.stderr}${boot.stdout}`)) return { status: "skipped", detail: "not loaded" };
     return { status: "failed", detail: `launchctl bootout: ${commandDetail(boot)} (the job may still be running)` };
