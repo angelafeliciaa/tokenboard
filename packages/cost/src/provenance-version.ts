@@ -4,10 +4,10 @@ import provenance from "./provenance.json" with { type: "json" };
 // route, the startup audit) never depend on a JSON import attribute resolving through transpilePackages.
 // The assert below pins these to provenance.json at module load (a test also covers it), so they can
 // never silently drift from the artifact the vendor script writes.
-export const PRICE_TABLE_VERSION = "litellm-2026-06-21";
-export const PRICE_TABLE_COMMIT_SHA = "9f97111edd736cf81e532f345663885457b916a9";
+export const PRICE_TABLE_VERSION = "litellm-2026-11-20";
+export const PRICE_TABLE_COMMIT_SHA = "fb0077053885f95ab3d4f302aec15024733705e2";
 export const PRICE_TABLE_UPSTREAM_SHA256 =
-  "e860025a4ddf7eb576b46a43126a0a523e0a60bdc296516d3533ddc17be31d6e";
+  "afbb50753937db89016b7e0855d79a1ba97ca5dc22c5f6c0a2204a9a3e16becc";
 
 if (
   provenance.priceTableVersion !== PRICE_TABLE_VERSION ||

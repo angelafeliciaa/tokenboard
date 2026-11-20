@@ -21,8 +21,8 @@ cost and bundled into the CLI for the offline local-preview estimate.
 
 - Project: https://github.com/BerriAI/litellm
 - License: MIT
-- Pinned commit: `9f97111edd736cf81e532f345663885457b916a9`
-  (sha256 `e860025a4ddf7eb576b46a43126a0a523e0a60bdc296516d3533ddc17be31d6e`)
+- Pinned commit: `fb0077053885f95ab3d4f302aec15024733705e2`
+  (sha256 `afbb50753937db89016b7e0855d79a1ba97ca5dc22c5f6c0a2204a9a3e16becc`)
 - Provenance recorded in `cli/src/cost/provenance.json`
 
 ---
