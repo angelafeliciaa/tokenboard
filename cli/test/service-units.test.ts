@@ -88,7 +88,8 @@ test("schtasks uses /SC DAILY for a daily interval and redirects to the log", ()
   assert.match(buildSchtasksRunCommand(spec), /^cmd \/c "\/opt\/node bin\/node" ".+cli\.js" "sync" >> ".+service\.log" 2>&1$/);
 });
 
-test("parseSchtasksState marks a disabled task as not loaded", () => {
-  assert.equal(parseSchtasksState("Scheduled Task State: Enabled\nStatus: Ready").loaded, true);
-  assert.equal(parseSchtasksState("Scheduled Task State: Disabled").loaded, false);
+test("parseSchtasksState marks a disabled task as failed and an unreadable one as unknown", () => {
+  assert.equal(parseSchtasksState("Scheduled Task State: Enabled\nStatus: Ready").status, "done");
+  assert.equal(parseSchtasksState("Scheduled Task State: Disabled").status, "failed");
+  assert.equal(parseSchtasksState("").status, "unknown");
 });

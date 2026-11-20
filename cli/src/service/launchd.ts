@@ -3,7 +3,8 @@ import { join, dirname } from "node:path";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import type { ServiceSpec } from "./spec.js";
 import type { SchedulerBackend } from "./backend.js";
-import type { CommandRunner } from "./exec.js";
+import { commandDetail, type CommandRunner } from "./exec.js";
+import { runSteps, type StepOutcome } from "./steps.js";
 
 const NOT_LOADED = /no such process|could not find|not find/i;
 
@@ -50,45 +51,73 @@ ${programArgs}
 `;
 }
 
+// `launchctl print` prints `state = running` / `state = not running` for a loaded job; anything else is unreadable.
+export function parseLaunchdState(stdout: string): StepOutcome {
+  const stateLine = stdout.split("\n").map((l) => l.trim()).find((l) => l.startsWith("state = "));
+  return stateLine
+    ? { status: "done", detail: stateLine }
+    : { status: "unknown", detail: "launchctl print succeeded but showed no `state =` line" };
+}
+
 export function createLaunchdBackend(run: CommandRunner): SchedulerBackend {
+  const target = (spec: ServiceSpec) => `${guiDomain()}/${spec.label}`;
+
+  const unload = async (spec: ServiceSpec): Promise<StepOutcome> => {
+    const boot = await run("launchctl", ["bootout", guiDomain(), launchdPlistPath(spec.label)]);
+    if (boot.code === 0) return { status: "done", detail: "unloaded" };
+    if (NOT_LOADED.test(`${boot.stderr}${boot.stdout}`)) return { status: "skipped", detail: "not loaded" };
+    return { status: "failed", detail: `launchctl bootout: ${commandDetail(boot)} (the job may still be running)` };
+  };
+
   return {
     name: "launchd",
 
-    async install(spec) {
-      const path = launchdPlistPath(spec.label);
-      await mkdir(launchAgentsDir(), { recursive: true });
-      await mkdir(dirname(spec.logPath), { recursive: true });
-      await writeFile(path, buildLaunchdPlist(spec), "utf8");
+    install: (spec) =>
+      runSteps([
+        ["create log folder", async () => {
+          await mkdir(dirname(spec.logPath), { recursive: true });
+          return { status: "done", detail: dirname(spec.logPath) };
+        }],
+        ["write plist", async () => {
+          await mkdir(launchAgentsDir(), { recursive: true });
+          await writeFile(launchdPlistPath(spec.label), buildLaunchdPlist(spec), "utf8");
+          return { status: "done", detail: launchdPlistPath(spec.label) };
+        }],
+        ["unload previous job", () => unload(spec)],
+        ["register with launchd", async () => {
+          const boot = await run("launchctl", ["bootstrap", guiDomain(), launchdPlistPath(spec.label)]);
+          return boot.code === 0
+            ? { status: "done", detail: target(spec) }
+            : { status: "failed", detail: `launchctl bootstrap: ${commandDetail(boot)}` };
+        }],
+        ["start first sync", async () => {
+          const kick = await run("launchctl", ["kickstart", target(spec)]);
+          return kick.code === 0
+            ? { status: "done", detail: "started" }
+            : { status: "failed", detail: `launchctl kickstart: ${commandDetail(kick)}` };
+        }],
+      ]),
 
-      await run("launchctl", ["bootout", guiDomain(), path]);
-      const boot = await run("launchctl", ["bootstrap", guiDomain(), path]);
-      if (boot.code !== 0) {
-        throw new Error(`launchctl bootstrap failed: ${boot.stderr.trim() || boot.stdout.trim() || `exit ${boot.code}`}`);
-      }
-      const kick = await run("launchctl", ["kickstart", `${guiDomain()}/${spec.label}`]);
-      return kick.code === 0
-        ? { firstRunStarted: true }
-        : { firstRunStarted: false, firstRunDetail: kick.stderr.trim() || kick.stdout.trim() || `exit ${kick.code}` };
-    },
+    uninstall: (spec) =>
+      runSteps([
+        ["unload job", () => unload(spec)],
+        ["remove plist", async () => {
+          await rm(launchdPlistPath(spec.label), { force: true });
+          return { status: "done", detail: launchdPlistPath(spec.label) };
+        }],
+      ]),
 
-    async uninstall(spec) {
-      const path = launchdPlistPath(spec.label);
-      const boot = await run("launchctl", ["bootout", guiDomain(), path]);
-      if (boot.code !== 0 && !NOT_LOADED.test(`${boot.stderr}${boot.stdout}`)) {
-        throw new Error(`launchctl bootout failed (job may still be running): ${boot.stderr.trim() || boot.stdout.trim() || `exit ${boot.code}`}`);
-      }
-      await rm(path, { force: true });
-    },
-
-    async status(spec) {
-      const print = await run("launchctl", ["print", `${guiDomain()}/${spec.label}`]);
-      const loaded = print.code === 0;
-      const stateLine = print.stdout.split("\n").map((l) => l.trim()).find((l) => l.startsWith("state = "));
-      return {
-        installed: loaded,
-        loaded,
-        detail: loaded ? stateLine ?? "registered with launchd" : "not registered with launchd",
-      };
-    },
+    status: (spec) =>
+      runSteps(
+        [
+          ["registered with launchd", async () => {
+            const print = await run("launchctl", ["print", target(spec)]);
+            if (print.code === 0) return parseLaunchdState(print.stdout);
+            if (NOT_LOADED.test(`${print.stderr}${print.stdout}`)) return { status: "failed", detail: "not registered" };
+            return { status: "unknown", detail: `launchctl print: ${commandDetail(print)}` };
+          }],
+        ],
+        "unknown",
+      ),
   };
 }

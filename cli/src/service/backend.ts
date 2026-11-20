@@ -1,26 +1,16 @@
 import { platform } from "node:os";
 import type { ServiceSpec } from "./spec.js";
+import type { StepResult } from "./steps.js";
 import { runCommand, type CommandRunner } from "./exec.js";
 import { createLaunchdBackend } from "./launchd.js";
 import { createSystemdBackend } from "./systemd.js";
 import { createSchtasksBackend } from "./schtasks.js";
 
-export interface ServiceStatus {
-  installed: boolean;
-  loaded: boolean;
-  detail: string;
-}
-
-export interface InstallResult {
-  firstRunStarted: boolean;
-  firstRunDetail?: string;
-}
-
 export interface SchedulerBackend {
   readonly name: string;
-  install(spec: ServiceSpec): Promise<InstallResult>;
-  uninstall(spec: ServiceSpec): Promise<void>;
-  status(spec: ServiceSpec): Promise<ServiceStatus>;
+  install(spec: ServiceSpec): Promise<StepResult[]>;
+  uninstall(spec: ServiceSpec): Promise<StepResult[]>;
+  status(spec: ServiceSpec): Promise<StepResult[]>;
 }
 
 export function selectBackend(os: NodeJS.Platform = platform(), run: CommandRunner = runCommand): SchedulerBackend {
