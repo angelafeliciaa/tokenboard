@@ -16,6 +16,8 @@ export type BoardWindow = z.infer<typeof boardWindowSchema>;
 export type BoardMetric = z.infer<typeof boardMetricSchema>;
 export type BoardFormat = z.infer<typeof boardFormatSchema>;
 
+export const MAX_BOARD_OFFSET = 100_000;
+
 export const boardQuerySchema = z.object({
   // omit or "global" => the global pseudo-community board
   community: z.string().default("global"),
@@ -25,6 +27,7 @@ export const boardQuerySchema = z.object({
   // coerce: HTTP query params arrive as strings (?limit=50), so parse "50" -> 50.
   // The .max(200)/.positive() guards still reject "999"/"abc"/"-5" after coercion.
   limit: z.coerce.number().int().positive().max(200).default(50),
+  offset: z.coerce.number().int().nonnegative().max(MAX_BOARD_OFFSET).default(0),
   format: boardFormatSchema.default("json"),
 });
 

@@ -55,19 +55,30 @@ export async function windowSumForUser(
 // ── read-path ───────────────────────────────────────────────────────────────
 
 // Scope -> the membership filter for community boards (global = no filter). Returns a sql fragment
-// joined into the windowed aggregate so c:{id} boards only rank that community's members.
-function communityFilter(scope: Scope): { join: ReturnType<typeof sql>; where: ReturnType<typeof sql> } {
-  if (scope === "g") return { join: sql``, where: sql`` };
+// joined onto `users u` so c:{id} boards only rank that community's members.
+function communityFilter(scope: Scope): { join: ReturnType<typeof sql> } {
+  if (scope === "g") return { join: sql`` };
   const communityId = scope.slice(2); // strip "c:"
-  return {
-    join: sql`join memberships mm on mm.user_id = udt.user_id and mm.community_id = ${communityId}`,
-    where: sql``,
-  };
+  return { join: sql`join memberships mm on mm.user_id = u.id and mm.community_id = ${communityId}` };
 }
 
 function dateLower(windowStart: string | null): ReturnType<typeof sql> {
   return windowStart === null ? sql`` : sql`and udt.date >= ${windowStart}`;
 }
+
+// Equal scores must rank in the SAME order Redis uses, or a board flips between paths. Redis
+// (ZREVRANGE) breaks ties by member BYTE-wise descending. user_id is a lowercase-hex uuid, so compare
+// its text under the "C" collation (plain memcmp), never a locale one (en_US would ignore case and
+// punctuation and disagree with Redis) and never `asc`.
+const TIE_BREAK = sql`u.id::text collate "C" desc`;
+
+// The fallback ranks the SAME population Redis holds, which is every non-banned user (global) or every
+// non-banned member (community), INCLUDING users with no usage in the window. Redis has them at $0:
+// seedZeroScoresForUser (sign-in via auth/callback, CLI claim via login/approve) ZADD NXs each user into
+// their global + community boards, and the nightly sweep re-seeds the same set after rebuilding 7d/30d
+// from buckets. So the board starts from `users` and LEFT JOINs usage; filtering to usage > 0 would
+// shrink totalEntries and shift every page relative to the Redis path.
+const WINDOW_TOTAL = (col: ReturnType<typeof sql>) => sql`coalesce(sum(${col}),0)`;
 
 // Top-N for the Postgres fallback when the Redis board key is empty/missing. banned-excluded; ranked
 // by the requested metric desc. Returns [{userId, score}] where score is tokens | micro-dollars.
@@ -77,21 +88,22 @@ export async function fallbackBoard(p: {
   windowStart: string | null;
   windowEnd: string;
   limit: number;
+  offset?: number;
 }): Promise<Array<{ userId: string; score: number }>> {
   const { join } = communityFilter(p.scope);
-  const orderCol = p.metric === "cost" ? sql`sum(udt.cost_usd)` : sql`sum(udt.tokens)`;
+  const orderCol = p.metric === "cost" ? WINDOW_TOTAL(sql`udt.cost_usd`) : WINDOW_TOTAL(sql`udt.tokens`);
   const rows = (await db.execute(sql`
-    select udt.user_id::text as user_id,
+    select u.id::text as user_id,
            coalesce(sum(udt.tokens),0)::text as tokens,
            coalesce(sum(udt.cost_usd),0)::text as cost_usd
-    from usage_day_total udt
-    join users u on u.id = udt.user_id and u.banned_at is null
+    from users u
     ${join}
-    where udt.date <= ${p.windowEnd} ${dateLower(p.windowStart)}
-    group by udt.user_id
-    having ${orderCol} > 0
-    order by ${orderCol} desc, udt.user_id asc
-    limit ${p.limit}
+    left join usage_day_total udt
+      on udt.user_id = u.id and udt.date <= ${p.windowEnd} ${dateLower(p.windowStart)}
+    where u.banned_at is null
+    group by u.id
+    order by ${orderCol} desc, ${TIE_BREAK}
+    limit ${p.limit} offset ${p.offset ?? 0}
   `)) as unknown as Array<{ user_id: string; tokens: string; cost_usd: string }>;
   return rows.map((r) => ({
     userId: r.user_id,
@@ -109,19 +121,19 @@ export async function fallbackMeRank(p: {
   userId: string | null;
 }): Promise<{ rank: number | null; score: number | null; totalEntries: number }> {
   const { join } = communityFilter(p.scope);
-  const orderCol = p.metric === "cost" ? sql`sum(udt.cost_usd)` : sql`sum(udt.tokens)`;
+  const orderCol = p.metric === "cost" ? WINDOW_TOTAL(sql`udt.cost_usd`) : WINDOW_TOTAL(sql`udt.tokens`);
   const rows = (await db.execute(sql`
     with ranked as (
-      select udt.user_id::text as user_id,
+      select u.id::text as user_id,
              coalesce(sum(udt.tokens),0)::text as tokens,
              coalesce(sum(udt.cost_usd),0)::text as cost_usd,
-             row_number() over (order by ${orderCol} desc, udt.user_id asc) as rk
-      from usage_day_total udt
-      join users u on u.id = udt.user_id and u.banned_at is null
+             row_number() over (order by ${orderCol} desc, ${TIE_BREAK}) as rk
+      from users u
       ${join}
-      where udt.date <= ${p.windowEnd} ${dateLower(p.windowStart)}
-      group by udt.user_id
-      having ${orderCol} > 0
+      left join usage_day_total udt
+        on udt.user_id = u.id and udt.date <= ${p.windowEnd} ${dateLower(p.windowStart)}
+      where u.banned_at is null
+      group by u.id
     )
     select (select count(*)::int from ranked) as total,
            r.rk::int as rk, r.tokens, r.cost_usd
@@ -131,15 +143,7 @@ export async function fallbackMeRank(p: {
   // total comes back on every row; when the user has no row we need a separate count.
   if (rows.length === 0) {
     const t = (await db.execute(sql`
-      with ranked as (
-        select udt.user_id
-        from usage_day_total udt
-        join users u on u.id = udt.user_id and u.banned_at is null
-        ${join}
-        where udt.date <= ${p.windowEnd} ${dateLower(p.windowStart)}
-        group by udt.user_id
-        having ${orderCol} > 0
-      ) select count(*)::int as total from ranked
+      select count(*)::int as total from users u ${join} where u.banned_at is null
     `)) as unknown as Array<{ total: number }>;
     return { rank: null, score: null, totalEntries: t[0]?.total ?? 0 };
   }

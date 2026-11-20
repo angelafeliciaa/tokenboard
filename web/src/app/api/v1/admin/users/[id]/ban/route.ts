@@ -15,6 +15,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { enforce } from "@/lib/ratelimit/enforce";
 import { requireJsonContentType } from "@/lib/http/require-json";
 import { boardTag, profKey, scopeForCommunity, METRIC_TOKENS, ALL_WINDOWS } from "@/lib/leaderboard/keys";
+import { removeUserFromBoards } from "@/lib/leaderboard/remove-user";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,6 +66,21 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     select community_id::text as "communityId" from memberships where user_id = ${id}::uuid
   `)) as unknown as Array<{ communityId: string }>;
 
+  // Purge a banned user from every board ZSET so they stop occupying page-offset indices (see
+  // remove-user.ts). Unban needs nothing: the next sync / nightly sweep + rebuild put them back.
+  // banned_at is already committed and is what the read path filters on, so a Redis failure here is
+  // reported as a partial success (below) rather than rolled back or hidden; re-sending is idempotent.
+  const scopes = ["g" as const, ...memberRows.map((r) => scopeForCommunity(r.communityId))];
+  let boardCleanupFailed = false;
+  if (banned) {
+    try {
+      await removeUserFromBoards(id, scopes);
+    } catch (err) {
+      boardCleanupFailed = true;
+      console.error("admin.ban: board cleanup failed", id, err instanceof Error ? err.message : err);
+    }
+  }
+
   // Cache bust: prof first (the effective freshness lever), then each board tag in its OWN try/catch.
   // Bust the GLOBAL board AND every community the user belongs to so they drop/return on every live
   // RENDER (the data layer re-excludes on the next uncached read; this closes the SWR window).
@@ -73,7 +89,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   } catch (err) {
     console.error("admin.ban: prof del failed (non-fatal)", err instanceof Error ? err.message : err);
   }
-  const scopes = ["g" as const, ...memberRows.map((r) => scopeForCommunity(r.communityId))];
   for (const scope of scopes)
     for (const m of METRIC_TOKENS)
       for (const w of ALL_WINDOWS) {
@@ -84,7 +99,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
         }
       }
 
-  console.info("admin.ban", { actor: admin.userId, target: id, banned }); // NO secrets
+  console.info("admin.ban", { actor: admin.userId, target: id, banned, boardCleanupFailed }); // NO secrets
+  if (boardCleanupFailed) {
+    // 502, not 200: the ban is in force (banned_at set) but the user may still hold a Redis rank, so
+    // pages can repeat rows until this succeeds. Re-send the same request to retry the cleanup.
+    return NextResponse.json({ ok: false, error: "board_cleanup_failed", id, banned: true }, { status: 502 });
+  }
   const res = NextResponse.json({ ok: true, id, banned: updated[0]!.banned_at !== null }, { status: 200 });
   for (const [k, v] of Object.entries(gate.headers)) res.headers.set(k, v);
   return res;
