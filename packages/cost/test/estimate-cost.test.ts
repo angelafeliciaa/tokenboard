@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { estimateCost } from "../src/estimate-cost";
-import type { PriceTable } from "../src/price-table";
+import { loadPriceTable, type PriceTable } from "../src/price-table";
 
 // MUST-TEST #2 — the offline cost engine. Fixture table mirrors real LiteLLM shapes:
 // - opus-4-8: all fields incl. distinct 5m and 1h cache-write costs (verified live).
@@ -74,4 +74,28 @@ test("zero counts on a known model -> cost 0, priced true", () => {
     prices,
   );
   assert.deepEqual(r, { costUsd: 0, priced: true });
+});
+
+// Real vendored snapshot: guards that the models people actually use are priced, not stored at $0.
+const real = loadPriceTable();
+const oneMillion = { input: 1_000_000, output: 1_000_000, cacheRead: 0, cacheCreate5m: 0, cacheCreate1h: 0 };
+
+for (const model of ["claude-opus-5-5", "claude-sonnet-5-5", "gpt-6-sol"]) {
+  test(`snapshot prices ${model}`, () => {
+    const { costUsd, priced } = estimateCost({ model, ...oneMillion }, real);
+    assert.equal(priced, true);
+    assert.ok(costUsd > 0);
+  });
+}
+
+test("bare gemini-4-argon falls back to the gemini/ provider-prefixed key", () => {
+  const bare = estimateCost({ model: "gemini-4-argon", ...oneMillion }, real);
+  const prefixed = estimateCost({ model: "gemini/gemini-4-argon", ...oneMillion }, real);
+  assert.equal(bare.priced, true);
+  assert.ok(bare.costUsd > 0);
+  assert.equal(bare.costUsd, prefixed.costUsd);
+});
+
+test("unknown model stays unpriced at $0 (no fuzzy matching)", () => {
+  assert.deepEqual(estimateCost({ model: "not-a-real-model", ...oneMillion }, real), { costUsd: 0, priced: false });
 });
