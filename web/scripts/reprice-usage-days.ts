@@ -112,18 +112,18 @@ interface Stats {
   days: number;
   staleRows: number;
   costChangedRows: number;
-  oldCosts: string[];
-  newCosts: string[];
+  costDeltaMicros: bigint;
   unpricedRowsByModel: Map<string, number>;
 }
+
+const toMicros = (cost: string): bigint => BigInt(Math.round(sumCostUsd([cost]) * 1_000_000));
 
 function record(stats: Stats, days: DayKey[], updates: RepriceUpdate[]): void {
   stats.days += days.length;
   stats.staleRows += updates.length;
   for (const u of updates) {
     if (u.costChanged) stats.costChangedRows++;
-    stats.oldCosts.push(u.row.costUsd);
-    stats.newCosts.push(u.costUsd6dp);
+    stats.costDeltaMicros += toMicros(u.costUsd6dp) - toMicros(u.row.costUsd);
     if (!u.priced) stats.unpricedRowsByModel.set(u.row.model, (stats.unpricedRowsByModel.get(u.row.model) ?? 0) + 1);
   }
 }
@@ -140,7 +140,7 @@ async function main(): Promise<void> {
     throw new Error("--write needs UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN set (the board rebuild runs after repricing)");
   }
 
-  const stats: Stats = { days: 0, staleRows: 0, costChangedRows: 0, oldCosts: [], newCosts: [], unpricedRowsByModel: new Map() };
+  const stats: Stats = { days: 0, staleRows: 0, costChangedRows: 0, costDeltaMicros: 0n, unpricedRowsByModel: new Map() };
   let cursor: DayKey | null = null;
   for (;;) {
     const days = await nextStaleDays(cursor, batchDays);
@@ -152,9 +152,8 @@ async function main(): Promise<void> {
       continue;
     }
     await db.transaction(async (tx) => {
-      // Lock first, read second: a concurrent sync for the same (user, date) holds the same lock
-      // (persist-usage.ts), so the token columns read here can't change before we write the cost.
-      // Sorted order (nextStaleDays) keeps lock acquisition consistent across batches.
+      // Lock first, read second: persist-usage.ts takes the same lock before it upserts, so a
+      // concurrent sync can't change the token columns between this read and the cost write.
       for (const d of days) {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${d.userId}), hashtext(${d.date}))`);
       }
@@ -166,7 +165,7 @@ async function main(): Promise<void> {
     console.log(`  repriced through ${cursor.userId} ${cursor.date} (${stats.staleRows} rows so far)`);
   }
 
-  const delta = sumCostUsd(stats.newCosts) - sumCostUsd(stats.oldCosts);
+  const delta = Number(stats.costDeltaMicros) / 1_000_000;
   console.log(
     `${write ? "repriced" : "would reprice"}: ${stats.staleRows} usage_day row(s) over ${stats.days} (user, date) day(s); ` +
       `${stats.costChangedRows} change cost; total cost delta ${delta >= 0 ? "+" : ""}${delta.toFixed(6)} USD`,

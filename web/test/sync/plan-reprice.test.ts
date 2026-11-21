@@ -40,11 +40,19 @@ test("a stale row whose cost does not change is still returned so its version is
   assert.equal(u!.costChanged, false);
 });
 
-test("all five token columns feed the cost, bare gemini-4 resolves via the prefix fallback", () => {
-  const row = { ...base, model: "gemini-4-argon", input: "10", output: "20", cacheRead: "30", cacheCreate5m: "40", cacheCreate1h: "50" };
+test("all five token columns feed the cost", () => {
+  const row = { ...base, input: "10", output: "20", cacheRead: "30", cacheCreate5m: "40", cacheCreate1h: "50" };
+  const [u] = planReprice([row], prices, CURRENT);
+  // 10*4e-6 + 20*2e-5 + 30*2e-7 + 40*5e-6 + 50*8e-6
+  assert.equal(u!.costUsd6dp, "0.001046");
+});
+
+test("bare gemini-4 resolves via the gemini/ prefix fallback", () => {
+  const row = { ...base, model: "gemini-4-argon", input: "10", output: "20", cacheRead: "30", cacheCreate5m: "0", cacheCreate1h: "0" };
   const [u] = planReprice([row], prices, CURRENT);
   assert.equal(u!.priced, true);
-  assert.ok(Number(u!.costUsd6dp) > 0);
+  // 10*2e-6 + 20*1e-5 + 30*1e-7
+  assert.equal(u!.costUsd6dp, "0.000223");
 });
 
 test("a token count beyond 2^53 fails loud instead of pricing a rounded number", () => {

@@ -23,7 +23,7 @@ cost and bundled into the CLI for the offline local-preview estimate.
 - License: MIT
 - Pinned commit: `fb0077053885f95ab3d4f302aec15024733705e2`
   (sha256 `afbb50753937db89016b7e0855d79a1ba97ca5dc22c5f6c0a2204a9a3e16becc`)
-- Provenance recorded in `cli/src/cost/provenance.json`
+- Provenance recorded in `packages/cost/src/provenance.json`
 
 ---
 
