@@ -31,6 +31,12 @@ export async function persistUsage(params: {
   const flags: SyncFlag[] = [];
 
   await db.transaction(async (tx) => {
+    // Lock before upserting. reprice-usage-days.ts takes this lock and then writes the same rows,
+    // so holding row locks while waiting here would deadlock against it.
+    for (const date of daysAffected) {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}), hashtext(${date}))`);
+    }
+
     // Step 8 — upsert each record's usage_day row (overwrite this device's row on conflict).
     for (const p of priced) {
       const r = p.record;
@@ -67,11 +73,8 @@ export async function persistUsage(params: {
         });
     }
 
-    // Steps 9-10 — per affected day: advisory lock, recompute the cross-device total, flag.
+    // Steps 9-10 — per affected day: recompute the cross-device total, flag.
     for (const date of daysAffected) {
-      // Serialize concurrent rollups for this (user, date) so the read-modify-write can't lose updates.
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}), hashtext(${date}))`);
-
       await tx.execute(sql`
         insert into usage_day_total (user_id, date, tokens, cost_usd, updated_at)
         select user_id, date, sum(tokens), sum(cost_usd), now()

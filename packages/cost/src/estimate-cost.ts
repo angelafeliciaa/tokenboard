@@ -32,7 +32,9 @@ export function estimateCost(
   counts: CostCounts,
   prices: PriceTable,
 ): { costUsd: number; priced: boolean } {
-  const p = prices[counts.model];
+  // LiteLLM lists gemini-4-* only as gemini/<name>, but clients report the bare name. One exact
+  // prefix rather than fuzzy matching, because a wrong match would misprice without any signal.
+  const p = prices[counts.model] ?? prices[`gemini/${counts.model}`];
   if (!p || p.input_cost_per_token == null) return { costUsd: 0, priced: false };
 
   const costUsd =

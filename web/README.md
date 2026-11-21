@@ -34,4 +34,4 @@ await qstash.schedules.create({
   are safe.
 
 **Rebuild from Postgres** (§7.6 — Redis loss is a non-event): `/api/cron/leaderboard-rebuild` (same
-signature gate), or locally `pnpm exec dotenv -e ../.env -- tsx scripts/rebuild-boards.ts`.
+signature gate), or locally `pnpm exec dotenv -e ../.env -- tsx --conditions react-server scripts/rebuild-boards.ts`.
