@@ -71,3 +71,4 @@ prototypes/shots/*.tmp.png
 
 # Playwright MCP scratch output (browser-probe snapshots/screenshots/logs)
 .playwright-mcp/
+.env*
