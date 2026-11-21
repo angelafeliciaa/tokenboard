@@ -76,7 +76,6 @@ test("zero counts on a known model -> cost 0, priced true", () => {
   assert.deepEqual(r, { costUsd: 0, priced: true });
 });
 
-// Real vendored snapshot: guards that the models people actually use are priced, not stored at $0.
 const real = loadPriceTable();
 const oneMillion = { input: 1_000_000, output: 1_000_000, cacheRead: 0, cacheCreate5m: 0, cacheCreate1h: 0 };
 

@@ -1,12 +1,6 @@
-// One-off ops script: reprice usage_day rows stored under an older price-table version (e.g. models
-// that were $0 because the snapshot predated them). A CLI re-sync can NOT fix these: the Idempotency-Key
-// is a hash of each chunk, so the server replays the stored response for an already-seen chunk and never
-// reprices it. Instead this recomputes cost_usd from the stored token columns with the same priceRecord
-// path a sync uses, bumps price_table_version, recomputes usage_day_total, then runs the board rebuild.
-//
-// Default is a DRY RUN (read-only, prints counts). Writing needs an explicit --write.
-// Idempotent: rows already on the current version are skipped; a rerun after a failure resumes, and
-// --write always ends with a rebuild so a crash between the DB update and the rebuild self-heals.
+// Reprices usage_day rows stored under an older price-table version, then rebuilds the boards.
+// A CLI re-sync can't do this: the server replays its stored response for a chunk it has seen.
+// Dry run unless --write. Safe to rerun: rows already on the current version are skipped.
 // Run: cd web && pnpm exec dotenv -e ../.env -- tsx --conditions react-server scripts/reprice-usage-days.ts [--write] [--batch-days N]
 import { sql } from "drizzle-orm";
 import { loadPriceTable, PRICE_TABLE_VERSION } from "@tokenboard/cost";
@@ -36,8 +30,7 @@ interface DayKey {
   date: string;
 }
 
-// Keyset page over the distinct (user, date) pairs that still hold a stale row. Paging by key (not
-// OFFSET) keeps the dry run and the write run identical even though writing shrinks the stale set.
+// Keyset, not OFFSET, paging: writing shrinks the stale set as we go.
 async function nextStaleDays(after: DayKey | null, limit: number): Promise<DayKey[]> {
   const cursorUser = after?.userId ?? "";
   const cursorDate = after?.date ?? "";
@@ -84,15 +77,14 @@ async function readStaleRows(ex: Executor, days: DayKey[]): Promise<StoredUsageD
 
 async function applyUpdate(ex: Executor, u: RepriceUpdate): Promise<void> {
   const r = u.row;
-  const result = await ex.execute(sql`
+  const { count } = (await ex.execute(sql`
     update usage_day
        set cost_usd = ${u.costUsd6dp}, price_table_version = ${PRICE_TABLE_VERSION}, updated_at = now()
      where user_id = ${r.userId}::uuid and device_id = ${r.deviceId}::uuid and date = ${r.date}::date
        and tool = ${r.tool} and model = ${r.model}
-  `);
-  // A silent 0-row update would mean the row vanished mid-run; surface it rather than count it repriced.
-  if ((result as unknown as { count: number }).count !== 1) {
-    throw new Error(`update touched ${(result as unknown as { count: number }).count} rows for ${r.userId} ${r.date} ${r.tool}/${r.model}, expected 1`);
+  `)) as unknown as { count: number };
+  if (count !== 1) {
+    throw new Error(`update touched ${count} rows for ${r.userId} ${r.date} ${r.tool}/${r.model}, expected 1`);
   }
 }
 
@@ -131,11 +123,10 @@ function record(stats: Stats, days: DayKey[], updates: RepriceUpdate[]): void {
 async function main(): Promise<void> {
   const { write, batchDays } = parseArgs(process.argv.slice(2));
   const prices = loadPriceTable();
-  const dbHost = new URL(process.env.DATABASE_URL!).host; // client.ts already failed loud if unset
+  const dbHost = new URL(process.env.DATABASE_URL!).host;
   console.log(`reprice-usage-days: ${write ? "WRITE" : "DRY RUN"} against ${dbHost}, price table ${PRICE_TABLE_VERSION}`);
 
-  // Fail before touching the DB if the final rebuild could not run, so we never leave totals updated
-  // with boards stale for want of an env var.
+  // Check before writing, so totals never change while the boards can't be rebuilt.
   if (write && (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN)) {
     throw new Error("--write needs UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN set (the board rebuild runs after repricing)");
   }
@@ -178,9 +169,7 @@ async function main(): Promise<void> {
     console.log("dry run only; rerun with --write to apply.");
     return;
   }
-  // Always rebuild, even at 0 stale rows: a previous run may have died after the DB commit but before
-  // the rebuild. rebuild also reseeds the `all` board from full history, so days older than its 40-day
-  // bucket window are covered too.
+  // Rebuild even at 0 stale rows, in case a previous run died between its commit and the rebuild.
   const { rebuildBoardsFromPostgres } = await import("@/lib/leaderboard/rebuild");
   const result = await rebuildBoardsFromPostgres();
   console.log(`rebuild: ${result.scopes} scope(s), ${result.buckets} bucket-rows`);

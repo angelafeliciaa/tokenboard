@@ -1,10 +1,8 @@
-// Pure half of the one-off reprice (scripts/reprice-usage-days.ts): given stored usage_day rows and
-// the current price table, say which rows are stale and what each should cost now. Reuses priceRecord
-// so a repriced row is byte-identical to what a fresh sync of the same counts would store.
+// Pure half of scripts/reprice-usage-days.ts. Uses priceRecord so a repriced row matches a fresh sync.
 import type { PriceTable } from "@tokenboard/cost";
 import { priceRecord } from "./compute-cost";
 
-// A usage_day row as the script reads it: bigints/numerics arrive as text (exact, no float round-trip).
+// bigint and numeric columns arrive as text, so nothing round-trips through a float.
 export interface StoredUsageDay {
   userId: string;
   deviceId: string;
@@ -27,7 +25,6 @@ export interface RepriceUpdate {
   costChanged: boolean;
 }
 
-// Counts are JS numbers in the shared engine; refuse to silently lose precision on a huge bigint.
 function toCount(value: string, field: string, row: StoredUsageDay): number {
   const n = Number(value);
   if (!Number.isSafeInteger(n)) {
@@ -38,8 +35,7 @@ function toCount(value: string, field: string, row: StoredUsageDay): number {
   return n;
 }
 
-// Rows already on currentVersion are skipped, which is what makes a rerun a no-op. "differs" (not
-// "older") on purpose: after a rollback to an older snapshot the stored rows should follow it too.
+// Compares with "differs", not "older", so stored rows follow a rollback to an older snapshot too.
 export function planReprice(
   rows: StoredUsageDay[],
   prices: PriceTable,
