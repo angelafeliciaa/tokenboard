@@ -13,11 +13,9 @@ function policyHint(c: CommunityMeta): string {
 export function CommunityPanel({
   community,
   membership,
-  inviteCode,
 }: {
   community: CommunityMeta;
   membership: ViewerMembership | null;
-  inviteCode: string | null;
 }) {
   return (
     <>
@@ -36,7 +34,7 @@ export function CommunityPanel({
       </section>
       {membership && (
         <section className={styles.panel}>
-          {inviteCode && <InviteFriends code={inviteCode} />}
+          <InviteFriends slug={community.slug} code={membership.inviteCode} />
           <LeaveCommunity communityId={membership.communityId} name={community.name} />
         </section>
       )}
