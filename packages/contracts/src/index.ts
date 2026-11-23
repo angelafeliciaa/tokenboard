@@ -25,6 +25,7 @@ export {
   boardWindowSchema,
   boardMetricSchema,
   boardFormatSchema,
+  MAX_BOARD_OFFSET,
   type BoardQuery,
   type BoardWindow,
   type BoardMetric,

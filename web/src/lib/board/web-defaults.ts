@@ -5,6 +5,8 @@
 import type { BoardWindow, BoardMetric } from "@tokenboard/contracts";
 
 export const WEB_DEFAULT_METRIC: BoardMetric = "cost";
+
+export const WEB_PAGE_SIZE = 50;
 // All-time by default so the board shows the fullest picture (bigger headline numbers) and matches
 // the CLI's all-time total — no "why is my number small" confusion. 7d/30d remain as tabs.
 export const WEB_DEFAULT_WINDOW: BoardWindow = "all";

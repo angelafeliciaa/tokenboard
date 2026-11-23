@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "test": "node --import tsx --import ./test/support/stub-build-only-imports.mjs --experimental-test-module-mocks --test \"test/**/*.test.ts\"",
     "db:migrate": "dotenv -e ../.env -- drizzle-kit migrate",
     "db:generate": "drizzle-kit generate --custom"
   },

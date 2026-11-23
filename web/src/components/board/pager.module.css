@@ -48,3 +48,17 @@
   opacity: 0.35;
   cursor: default;
 }
+
+/* Empty page past 1: a way back instead of a vanished pager. Links keep the 44px .pg target. */
+.emptyPage {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+}
+.back {
+  padding: 0 16px;
+  text-decoration: none;
+  white-space: nowrap;
+}
