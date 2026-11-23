@@ -85,7 +85,7 @@ export default async function LandingPage() {
                     <span className={styles.cmd}>
                       tokenboard <b>sync</b>
                     </span>
-                    <span className={styles.cmt}># push usage (hourly cron)</span>
+                    <span className={styles.cmt}># push usage (or run daily in the background)</span>
                   </div>
                   <div className={styles.ln}>
                     <span className={styles.pr}>$</span>
